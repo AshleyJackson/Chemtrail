@@ -6,7 +6,9 @@ applications are windows rather than the primary interface.
 **Status:** scaffold implemented. Base platform settled as **Fedora bootc**; the
 release pipeline exists as code and runs end to end on dummy digests. An installer
 ISO can be built from the image and installed in a VM; the desktop is COSMIC
-(ADR-0018) but is not in the image yet, and there is no published image.
+(ADR-0018) but is not in the image yet, and there is no published image. That ISO
+is 3.42 GB, which exceeds GitHub's 2 GiB per-asset limit, so the install and
+distribution path is being redesigned in [ADR-0020](adr/0020-thin-install-media.md).
 
 ## What this project is
 
@@ -70,6 +72,7 @@ differentiated, and none of it should consume the project.
 | [0017](adr/0017-tests-live-in-tests.md) | Tests live in `tests/`, and everything has a test | **Accepted** |
 | [0018](adr/0018-cosmic-desktop-for-v1.md) | Ship COSMIC as the desktop environment for v1 | **Accepted** |
 | [0019](adr/0019-no-xlibre.md) | Do not ship XLibre, in any role | Rejected |
+| [0020](adr/0020-thin-install-media.md) | Thin install media, capabilities provisioned after first boot | Proposed |
 
 Five ADRs define the product: inference is local-first with an explicit cloud
 route (0011), distribution is public (0012), the platform is Fedora bootc (0013),
@@ -80,9 +83,34 @@ commitment to a compositor we write. ADR-0014 records what the base change
 dissolved. ADR-0017 is process rather than product: it fixes where tests live and
 makes "everything has a test" a failing assertion instead of an intention.
 ADR-0019 is a rejection rather than a commitment: XLibre is out of the image, and
-Fedora's Xwayland stays the only X server.
+Fedora's Xwayland stays the only X server. ADR-0020 is a proposal about how the
+system reaches a machine rather than what it contains: nightlies publish an image
+and not an installer, the installer carries no payload, and the NVIDIA layer
+arrives after first boot.
 
 ## Changelog of the documentation
+
+**2026-11-10, thirteenth revision.** The installer turned out to be unpublishable.
+
+- **The ISO is 3.42 GB and GitHub caps a release asset at 2 GiB.** The nightly
+  artefact could not have been uploaded at any cost, which reframes the size
+  question from budget to feasibility.
+- **Measured what the builder can actually produce.** `anaconda-iso` and `iso`
+  both come out at exactly 3,419,379,712 bytes, so the second is not a thin
+  installer; `bootc-installer` fails with `bootc container inspect: exit status 1`
+  and prints nothing more at debug level, although the same command works when run
+  in the image directly. There is no small ISO in this release of the tool.
+- **Measured where the payload goes.** NVIDIA is ~1.19 GB of the 3.5 GB the build
+  adds to the base and graphics is ~0.39 GB, so two thirds of the payload is
+  driver and rendering.
+- **ADR-0020 proposed**, not accepted: nightlies publish an image rather than an
+  installer, the medium carries no payload and pulls the image from a registry with
+  Anaconda's `bootc` kickstart command, and the NVIDIA layer is a second image that
+  `aios-provision` fetches after first boot on machines that have the hardware.
+- **The reason the split is driver-first rather than desktop-first** is recorded
+  there: the assistant is a layer-shell overlay and needs a compositor, so a base
+  without COSMIC has no product, while a base without NVIDIA merely runs on
+  `llvmpipe` until the layer arrives.
 
 **2026-11-10, twelfth revision.** The image became installable.
 
