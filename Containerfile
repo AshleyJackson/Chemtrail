@@ -10,8 +10,13 @@
 # The base is pinned by digest (the multi-arch index digest). `dnf upgrade`
 # still floats within Fedora 45; pinning that snapshot to a date is a Phase 0
 # open question and is not pretended otherwise here.
+#
+# Re-pinned 2026-11-11: quay.io garbage-collects manifests that no tag
+# references, and Fedora re-tags `45` at point releases — the original pin
+# (sha256:0b34d5a...) stopped resolving and CI failed with "not found". A
+# digest pin on quay is a lease, not an anchor; verify it when a build fails.
 
-ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:45@sha256:0b34d5a62123eee7b18b34489e683b24850b2676c2ed7816cbbb38440914f559
+ARG BASE_IMAGE=quay.io/fedora/fedora-bootc:45@sha256:32efabff97ea5062b9c1f20fafc519038f6165017a140cb6c3b96469ba69a86e
 
 FROM ${BASE_IMAGE}
 
