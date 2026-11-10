@@ -1,6 +1,6 @@
 # ADR-0020: Thin install media, capabilities provisioned after first boot
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-11-11)
 - **Date:** 2026-11-10
 - **Deciders:** project owner
 - **Supersedes:** —
@@ -67,8 +67,17 @@ downloads: machines on a channel update in place, they do not reinstall.
 
 ### The install medium does not have to be ours
 
-Anaconda gained a `bootc` kickstart command (announced 2025-12-31, present in the
-Fedora line this project tracks):
+Anaconda gained a `bootc` kickstart command (announced 2025-12-31). The
+announcement demonstrated Rawhide media only, so before accepting this ADR it was
+verified against the release line we track: pykickstart **3.77-1.fc45 from the
+Fedora 45 repositories** — the package Anaconda on F45 media uses to parse
+kickstarts — registers `bootc` as `pykickstart.commands.bootc.F45_Bootc` and
+parses the line below without error, recording it with its options intact
+(verified 2026-11-11). In this release the command takes `--stateroot`,
+`--source-imgref` (required; a transport prefix such as `registry:` is required),
+`--target-imgref` (a transport prefix is forbidden there, and it defaults to the
+source value — which is wrong for updates — so set it explicitly) and, new in
+F45, `--bootloader` and `--composefs`:
 
 ```
 bootc --source-imgref=registry:quay.io/fedora/fedora-bootc:rawhide
@@ -263,9 +272,13 @@ and what is on the disk.
 
 ## Follow-ups
 
-- Write the kickstart file and decide where `inst.ks=` is served from.
-- Confirm the Fedora 45 netinstall media actually carries the `bootc` kickstart
-  command; the announcement demonstrated it on Rawhide media.
+- Write the kickstart file and decide where `inst.ks=` is served from. The
+  medium will be served from the same host as the channel JSON, so this resolves
+  with the channel URL question in [docs/README.md](../README.md).
+- **Done 2026-11-11:** confirmed that Fedora 45's installer carries the `bootc`
+  kickstart command — verified against pykickstart 3.77-1.fc45 from the F45
+  repositories, not just the Rawhide demonstration in the announcement; see
+  Context for the options this release accepts.
 - Measure the actual download of `aios-base` and set an install-size budget; the
   512 MiB medium budget in §2 is a target until it is measured.
 - Build `aios-base` and `aios-gpu` from one Containerfile pair, and make CI fail

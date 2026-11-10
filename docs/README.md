@@ -4,11 +4,14 @@ An assistant-first operating system: the user states intent, the system acts, an
 applications are windows rather than the primary interface.
 
 **Status:** scaffold implemented. Base platform settled as **Fedora bootc**; the
-release pipeline exists as code and runs end to end on dummy digests. An installer
-ISO can be built from the image and installed in a VM; the desktop is COSMIC
-(ADR-0018) but is not in the image yet, and there is no published image. That ISO
-is 3.42 GB, which exceeds GitHub's 2 GiB per-asset limit, so the install and
-distribution path is being redesigned in [ADR-0020](adr/0020-thin-install-media.md).
+release pipeline exists as code and runs end to end on dummy digests. The install
+path is a network install ([ADR-0020](adr/0020-thin-install-media.md), accepted):
+Fedora's own netinst media plus a hosted kickstart that pulls the image from
+GitHub Container Registry — no installer ISO is built or published, because the
+first one came out at 3.42 GB against GitHub's 2 GiB per-asset limit. The desktop
+is COSMIC (ADR-0018) but is not in the image yet. The build workflow publishes an
+image to GHCR on every commit to `master`; it has never completed a publication,
+and why is recorded in the changelog below.
 
 ## What this project is
 
@@ -72,7 +75,7 @@ differentiated, and none of it should consume the project.
 | [0017](adr/0017-tests-live-in-tests.md) | Tests live in `tests/`, and everything has a test | **Accepted** |
 | [0018](adr/0018-cosmic-desktop-for-v1.md) | Ship COSMIC as the desktop environment for v1 | **Accepted** |
 | [0019](adr/0019-no-xlibre.md) | Do not ship XLibre, in any role | Rejected |
-| [0020](adr/0020-thin-install-media.md) | Thin install media, capabilities provisioned after first boot | Proposed |
+| [0020](adr/0020-thin-install-media.md) | Thin install media, capabilities provisioned after first boot | **Accepted** — 2026-11-11 |
 
 Five ADRs define the product: inference is local-first with an explicit cloud
 route (0011), distribution is public (0012), the platform is Fedora bootc (0013),
@@ -83,12 +86,35 @@ commitment to a compositor we write. ADR-0014 records what the base change
 dissolved. ADR-0017 is process rather than product: it fixes where tests live and
 makes "everything has a test" a failing assertion instead of an intention.
 ADR-0019 is a rejection rather than a commitment: XLibre is out of the image, and
-Fedora's Xwayland stays the only X server. ADR-0020 is a proposal about how the
-system reaches a machine rather than what it contains: nightlies publish an image
-and not an installer, the installer carries no payload, and the NVIDIA layer
-arrives after first boot.
+Fedora's Xwayland stays the only X server. ADR-0020 decides how the system reaches
+a machine rather than what it contains: nightlies publish an image and not an
+installer, the install medium carries no payload (Fedora's netinst plus a hosted
+kickstart), and the NVIDIA layer arrives after first boot.
 
 ## Changelog of the documentation
+
+**2026-11-11, fourteenth revision.** ADR-0020 accepted; the install path becomes a network install.
+
+- **ADR-0020 accepted** (the owner: "i accept the thin client"). Nightlies publish
+  an image and never an installer; the install medium is Fedora's own netinst plus
+  a hosted kickstart that pulls the image from GHCR with Anaconda's `bootc` command.
+- **The F45 claim was verified, not assumed.** The announcement behind ADR-0020
+  demonstrated Rawhide media only, so before accepting it I checked the release we
+  track: pykickstart 3.77-1.fc45 from the Fedora 45 repositories — the parser
+  Anaconda on F45 media uses — registers `bootc` (`F45_Bootc`) and parses
+  `--source-imgref`/`--target-imgref` without error, recording both options. The
+  ADR now records that evidence and the full option set of this release, including
+  that `--target-imgref` takes no transport prefix and must be set explicitly for
+  updates to work at all.
+- **The build workflow had never published an image, and why is now known.** It
+  failed on its first run: GHCR package names must be lowercase, but the tag was
+  built from `github.repository`, which is mixed case. The workflow now computes a
+  lowercased registry reference; this revision's push is the first real attempt to
+  publish an image to GHCR.
+- **The network-install path lands in [run/virtualbox.md](run/virtualbox.md):**
+  Fedora's netinst, `inst.ks=` on the kernel command line, and a kickstart served
+  over HTTP. The hosted kickstart itself is written once CI has published an image
+  to pin it to; until then there is nothing for it to point at.
 
 **2026-11-10, thirteenth revision.** The installer turned out to be unpublishable.
 
@@ -282,7 +308,7 @@ with cloud fallback (0011), and the base reopened (0009).
 | Self-hosted GPU runner for the hardware gate | Any automated promotion to stable | — |
 | Self-hosted KVM runner for the boot gate | Any automated promotion to weekly | — |
 | `RELEASE_TOKEN` with permission to push to `channels/**` | Any automated promotion | — |
-| Channel URL, and when to front GitHub with our own domain | Update resolution | — |
+| Channel URL (it also hosts the install kickstart for `inst.ks=`), and when to front GitHub with our own domain | Update resolution; network install | — |
 | Deferral ceiling and escalation for security updates | ADR-0016 follow-up | — |
 | Does a COSMIC layer-shell overlay hold focus and summon over fullscreen, at under 50 ms? | Assistant surface v0 | — |
 | COSMIC app set and first-run experience | Public beta | — |

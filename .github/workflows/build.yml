@@ -26,7 +26,6 @@ permissions:
   id-token: write
 
 env:
-  IMAGE: ghcr.io/${{ github.repository }}
   BASE_DIGEST: sha256:0b34d5a62123eee7b18b34489e683b24850b2676c2ed7816cbbb38440914f559
 
 jobs:
@@ -42,8 +41,11 @@ jobs:
         id: identity
         run: |
           build_id="$(date -u +%Y.%m.%d)+g${GITHUB_SHA::7}.r${GITHUB_RUN_NUMBER}"
+          # GHCR package names must be lowercase; github.repository is not.
+          image_ref="ghcr.io/$(printf '%s' "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
           echo "build_id=${build_id}" >> "$GITHUB_OUTPUT"
-          echo "Building ${build_id}" >> "$GITHUB_STEP_SUMMARY"
+          echo "image_ref=${image_ref}" >> "$GITHUB_OUTPUT"
+          echo "Building ${build_id} -> ${image_ref}" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -62,7 +64,7 @@ jobs:
           provenance: mode=max
           sbom: true
           # A convenience tag. The digest is the identity; nothing follows the tag.
-          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          tags: ${{ steps.identity.outputs.image_ref }}:sha-${{ github.sha }}
           build-args: |
             BUILD_ID=${{ steps.identity.outputs.build_id }}
             SOURCE_COMMIT=${{ github.sha }}
@@ -83,7 +85,7 @@ jobs:
             exit 0
           fi
           cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
-            "${IMAGE}@${{ steps.build.outputs.digest }}"
+            "${{ steps.identity.outputs.image_ref }}@${{ steps.build.outputs.digest }}"
 
       - name: write build evidence
         env:

@@ -11,11 +11,12 @@ bootable.
 
 ```
 Containerfile  ->  OCI image  ->  registry  ->  bootc upgrade  ->  deployment
-                       |                              |
-                       +---- bootc-image-builder ----+
-                                     |
-                              installer ISO / disk image
+                        |
+                        +-- install: Fedora netinst + hosted kickstart (ADR-0020)
 ```
+
+No installer artefact is built by this project at all; the medium is
+Fedora's, and it pulls the image from the registry at install time.
 
 Consequences that matter for this project:
 
@@ -168,9 +169,13 @@ Encryption: LUKS on `/var` at install, using the installer's existing support.
 
 ## 7. Installer and first boot
 
-`bootc-image-builder` produces an Anaconda-based ISO from the OCI image. Anaconda
-is a graphical installer that already handles partitioning, encryption, and
-Secure Boot, which satisfies M4 without inventing anything.
+The install medium is Fedora's own netinst media, driven by a hosted kickstart
+that pulls the image from GHCR with Anaconda's `bootc` command (ADR-0020). We
+build no installer ISO: the medium is published and mirrored by Fedora, and this
+project hosts only the kickstart. Anaconda still handles partitioning,
+encryption, and Secure Boot, which satisfies M4 without inventing anything. The
+VirtualBox recipe for testing the network install is in
+[run/virtualbox.md](../run/virtualbox.md) §7.
 
 First boot, in order:
 
@@ -197,11 +202,13 @@ Enforcing, with custom policy for our daemons.
 ## 9. Build, sign, promote
 
 ```
-commit -> CI build (Containerfile) -> sign image -> push to staging registry
+commit -> CI build (Containerfile) -> sign image -> push to GHCR by digest
        -> automated install + health test on reference hardware
-       -> promote tag -> production registry
-       -> bootc-image-builder -> release ISO + disk images -> sign artefacts
+       -> promote: move a signed pointer in channels/*.json (ADR-0015)
 ```
+
+No installer artefact is built at any stage (ADR-0020): the install medium is
+Fedora's netinst plus a hosted kickstart, and promotion renders one per channel.
 
 - The registry is the update channel. Its availability is a product dependency.
 - Image signature verification is mandatory on the device, not advisory.

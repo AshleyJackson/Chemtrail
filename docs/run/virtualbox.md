@@ -5,6 +5,12 @@ a human installs it, and the installed system boots. It is not a desktop test �
 the image built today carries the platform (NVIDIA module, session libraries,
 greenboot) and no desktop environment.
 
+Two paths are documented here. Sections 1–6 record how the image was first
+installed from an ISO we build; that path is history now, kept because it
+recorded three failures that shaped the builder. **The install path going forward
+is the network install in section 7** (ADR-0020): Fedora's own netinst media plus
+a kickstart that pulls the image from GHCR. No ISO of ours is built or published.
+
 ## 1. Build the ISO
 
 ```bash
@@ -135,3 +141,81 @@ Get-Content "$disks\serial.log" -Tail 80
 ```powershell
 & $vbox unregistervm $vm --delete
 ```
+
+## 7. Network install (ADR-0020)
+
+The install medium is Fedora's netinst ISO — we build nothing and host only a
+few-KB kickstart that tells Anaconda to pull the image from GHCR with its `bootc`
+command. The kickstart pins the image by digest; it lives in this repository as
+`install/aios-netinst.ks`, written once CI has published an image for it to pin
+(the build workflow publishes one on every commit to `master`).
+
+### 7.1 Get the media
+
+- **Fedora Server 45 netinst ISO** (~1 GB) from Fedora's own download page,
+  https://fedoraproject.org/fedora-server/ — the "netinstall" image. It is
+  published and mirrored by Fedora; it costs this project no storage and no
+  releases.
+- **The kickstart**, served over HTTP. For a one-off test no hosting decision is
+  needed:
+
+  ```
+  inst.ks=https://raw.githubusercontent.com/AshleyJackson/Chemtrail/master/install/aios-netinst.ks
+  ```
+
+  One file per install, so the rate limits that make raw.githubusercontent.com a
+  poor fit for *update resolution* do not matter here. Local serving is in 7.3.
+
+### 7.2 Create the VM
+
+Same as section 2, with two differences:
+
+- Attach the **Fedora netinst ISO** on port 0 instead of our ISO.
+- The installer must reach both the internet (it pulls the image) and the
+  kickstart URL. Plain NAT reaches the internet but not the host; a NAT network
+  reaches both:
+
+  ```powershell
+  & $vbox createnatnet AI_OS-net --netname 192.168.56.0/24
+  & $vbox modifyvm $vm --nic1 natnetwork
+  ```
+
+  The host gets an address in that subnet; `ipconfig` shows it if you serve the
+  kickstart locally.
+
+### 7.3 Install with inst.ks=
+
+Boot the VM from the netinst ISO. At the GRUB menu press `e`, append to the end
+of the `linux` line:
+
+```
+ inst.ks=https://raw.githubusercontent.com/AshleyJackson/Chemtrail/master/install/aios-netinst.ks
+```
+
+and boot with Ctrl+X. Anaconda fetches the kickstart and pre-fills everything it
+contains — storage (it wipes the disk), locale, and the `bootc` deployment — so
+the install is confirm-and-begin rather than a form to fill in. To serve the file
+locally instead of from GitHub:
+
+```powershell
+# on the host, from the repository root; any static file server works
+python -m http.server 8080
+```
+
+and use `inst.ks=http://<host-ip-in-192.168.56.0/24>:8080/install/aios-netinst.ks`.
+
+Expect the deployment step to be slow in a different way than the ISO path: the
+image is pulled from GHCR over the VM's network, several gigabytes of it. The
+progress bar is honest about it.
+
+### 7.4 What success looks like / when it fails
+
+Sections 4 and 5 apply unchanged — `bootc status` on the installed system must
+show the digest the kickstart named. Two failure modes are specific to this path:
+
+- **Anaconda cannot fetch the kickstart:** wrong URL, or a network mode that
+  cannot reach the host (plain NAT). The error names the URL it tried.
+- **The `bootc` step fails with a registry error:** the image is not published
+  yet, or GHCR does not serve it anonymously — both are pipeline problems, not
+  installer problems. Check that the build workflow has completed and that the
+  digest in the kickstart matches what GHCR serves.

@@ -403,9 +403,9 @@ Notes that matter:
 - **`provenance` and `sbom`** are cheap and make the supply chain legible.
 - **Signing key in a KMS or secret, not on a runner filesystem.** The public half
   ships in the image.
-- **The installer ISO is not built on every commit.** `bootc-image-builder` is
-  slow and disk-hungry. Build it for `stable` promotions and on demand, and attach
-  it to the release.
+- **No installer media are built at all** (ADR-0020). The install medium is
+  Fedora's own netinst plus a hosted kickstart that pulls the image from GHCR;
+  this project hosts only the kickstart, and promotion renders one per channel.
 
 ### Retention
 
@@ -414,7 +414,7 @@ Notes that matter:
 | nightly digests | 30 |
 | weekly digests | 12 |
 | stable digests | all |
-| release assets (ISO, SBOM) | all |
+| release assets (SBOM) | all |
 
 Without a retention policy, GHCR storage and release assets become a silent bill.
 Prune by age, and never prune the digest a channel currently points at.
@@ -430,7 +430,8 @@ gh release create v1.4.0 \
   --target "$BUILD_SHA" \
   --notes-file notes/v1.4.0.md
 
-gh release upload v1.4.0 dist/aios-1.4.0.iso dist/sbom.json
+# No installer artefact (ADR-0020): the install medium is Fedora's netinst plus a hosted kickstart.
+gh release upload v1.4.0 dist/sbom.json
 gh release edit v1.4.0 --draft=false      # publish → tag and assets lock
 gh release verify v1.4.0                  # immutability + attestation
 ```
@@ -442,7 +443,7 @@ assembled completely before it goes live.
 What this buys, for no infrastructure:
 
 - The tag is pinned to the build commit and cannot be moved.
-- Assets (ISO, SBOM, signatures) cannot be replaced or deleted.
+- Assets (SBOM, signatures) cannot be replaced or deleted.
 - GitHub generates a release attestation recording tag, commit and assets.
 - Users get readable notes and a download page.
 
