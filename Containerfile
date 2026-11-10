@@ -73,3 +73,13 @@ RUN chmod 0755 /etc/greenboot/check/required.d/*.sh /etc/greenboot/check/wanted.
 # promotion and lives only in the channel file (ADR-0015 §6).
 RUN mkdir -p /usr/lib/aios \
  && printf '%s\n' "${BUILD_ID}" > /usr/lib/aios/build-id
+
+# Fedora 45 keeps its default repository definitions in /usr/share/dnf5/repos.d,
+# and dnf5 reads them from there. osbuild, which turns this image into an
+# installer ISO, reads only /etc/yum.repos.d and therefore finds no repositories
+# at all ("NoReposError: There are no enabled repositories"). Copying the files
+# where osbuild looks changes nothing for dnf5, which reads both locations.
+RUN if [ -d /usr/share/dnf5/repos.d ]; then \
+      mkdir -p /etc/yum.repos.d \
+      && cp -n /usr/share/dnf5/repos.d/*.repo /etc/yum.repos.d/; \
+    fi

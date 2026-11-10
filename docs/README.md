@@ -41,6 +41,12 @@ differentiated, and none of it should consume the project.
     [image and updates](architecture/image-and-updates.md) — historical analyses
     retained for their reasoning; their mechanisms are superseded.
 
+## Running it
+
+- [Installing the image in VirtualBox](run/virtualbox.md) — build an installer
+  ISO, install it in a VM, and check that the installed system boots and reports
+  its own build identity.
+
 ## Decision log
 
 | ID | Title | Status |
