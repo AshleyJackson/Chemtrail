@@ -3,6 +3,7 @@
 .github
 docs
 tools
+tests
 .demo
 .evidence
 build

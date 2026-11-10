@@ -12,7 +12,7 @@ from unittest.mock import patch
 from aios_release import cli, demo, evidence
 from aios_release.manifest import ChannelManifest
 from aios_release.signing import DevHmacSigner
-from tests.factories import BASE, boots, build, digest
+from tests.release.factories import BASE, boots, build, digest
 
 
 class CliTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class CliTests(unittest.TestCase):
         return code, out.getvalue(), err.getvalue()
 
     def seed_nightly_evidence(self, sha):
-        from tests.factories import image
+        from tests.release.factories import image
 
         evidence.write(build(sha, BASE), self.evidence_dir)
         evidence.write(image(sha, BASE), self.evidence_dir)
@@ -201,7 +201,7 @@ class CliTests(unittest.TestCase):
     def seed_stable_evidence(self, sha):
         from datetime import timedelta
 
-        from tests.factories import hardware, image, promotion
+        from tests.release.factories import hardware, image, promotion
 
         evidence.write(build(sha, BASE), self.evidence_dir)
         evidence.write(image(sha, BASE), self.evidence_dir)

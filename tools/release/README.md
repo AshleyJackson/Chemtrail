@@ -72,8 +72,11 @@ python -m aios_release record --kind image --digest sha256:… --commit "$SHA" \
 
 ## Tests
 
+Tests live in `tests/release/`, not next to the code — see
+[ADR-0017](../../docs/adr/0017-tests-live-in-tests.md).
+
 ```bash
-python -m unittest discover -s tools/release/tests -t tools/release
+PYTHONPATH=tools/release python -m unittest discover -s tests -t .
 ```
 
 The suite covers schema validation, canonical signing bytes, every gate,

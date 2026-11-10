@@ -539,7 +539,9 @@ than discovering it when a release ships broken.
 
 - `tools/release/` — gates, candidate selection, promotion, widening,
   withdrawal, canonical signing payload, device-side resolution, and a
-  four-week simulation. 89 unit tests, all passing.
+  four-week simulation. The suite lives in `tests/release/`
+  ([ADR-0017](../adr/0017-tests-live-in-tests.md)) and has 158 tests, all
+  passing.
 - `Containerfile` — pinned base, NVIDIA kmod built against the image's own
   kernel and stripped, session libraries, greenboot checks, stock timer masked.
 - `ci/promote.sh` and the five workflows — build, static check, boot, hardware,

@@ -15,7 +15,7 @@ from aios_release.manifest import (
     problems,
     validate,
 )
-from tests.factories import BASE, digest, manifest
+from tests.release.factories import BASE, digest, manifest
 
 
 class CanonicalTests(unittest.TestCase):

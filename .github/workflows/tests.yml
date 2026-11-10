@@ -1,0 +1,38 @@
+name: tests
+
+# ADR-0017: one command runs the whole suite, and CI runs that command. It needs
+# nothing but Python, so a failure here is about this repository, never about a
+# missing runner.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Stdlib only. One stable interpreter rather than a matrix, until there
+          # is a compatibility question that a matrix would answer.
+          python-version: '3.13'
+
+      - name: Unit tests, layout rules, and documentation checks
+        env:
+          PYTHONPATH: tools/release
+        run: python -m unittest discover -s tests -t . -v
+
+      - name: Every shell script parses
+        run: for script in ci/*.sh; do echo "checking $script"; bash -n "$script"; done
+
+      - name: Every workflow parses and keeps its jobs
+        run: |
+          python -m pip install --quiet pyyaml
+          python ci/validate-workflows.py

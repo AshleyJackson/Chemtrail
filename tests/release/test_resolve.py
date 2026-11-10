@@ -4,7 +4,7 @@ import unittest
 
 from aios_release import resolve
 from aios_release.manifest import Rollout
-from tests.factories import BASE, digest, manifest
+from tests.release.factories import BASE, digest, manifest
 
 
 class ResolveTests(unittest.TestCase):

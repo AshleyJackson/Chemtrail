@@ -58,14 +58,35 @@ differentiated, and none of it should consume the project.
 | [0014](adr/0014-nvidia-and-workloads-on-glibc.md) | NVIDIA, CUDA, and workload packaging | **Accepted** |
 | [0015](adr/0015-release-channels-by-promotion.md) | Release channels by promotion, not branch merging | **Accepted** — revised 2026-11-10 |
 | [0016](adr/0016-update-application-policy.md) | Update application policy: two modes, no forced reboots | **Accepted** |
+| [0017](adr/0017-tests-live-in-tests.md) | Tests live in `tests/`, and everything has a test | **Accepted** |
 
 Six ADRs define the product: the shell is the interface (0010), inference is
 local-first with an explicit cloud route (0011), distribution is public (0012),
 the platform is Fedora bootc (0013), and releases are promoted by digest (0015)
 with a user-chosen restart policy (0016). ADR-0014 records what the base change
-dissolved.
+dissolved. ADR-0017 is process rather than product: it fixes where tests live and
+makes "everything has a test" a failing assertion instead of an intention.
 
 ## Changelog of the documentation
+
+**2026-11-10, ninth revision.** Tests moved to `tests/`, and the rule has teeth.
+
+- **ADR-0017 accepted.** All tests live in a top-level `tests/` tree mirroring
+  `tools/`, and nothing named `test_*` lives anywhere else.
+  `tools/release/tests/` is gone; the discovery command no longer names a tool.
+- **"Everything has a test" is enforced rather than intended.**
+  `tests/layout/test_layout.py` walks the tree and fails with a list of modules
+  that have no `test_<module>.py`. Writing the rule exposed four modules with
+  only indirect coverage — `canonical`, `signing`, `evidence` and `demo` — each
+  of which now has its own test module.
+- **The documentation is tested too.** Relative links resolve, every document is
+  reachable from this index, ADR numbers are sequential, every ADR carries the
+  template sections and a known status, and every ADR appears in the decision
+  log.
+- The suite grew from 89 to 158 tests. One command runs all of it:
+  `PYTHONPATH=tools/release python -m unittest discover -s tests -t .`
+- `tests.yml` runs that command, `bash -n` over every `ci/*.sh`, and
+  `ci/validate-workflows.py`, on push and on pull request.
 
 **2026-11-10, eighth revision.** The release design became code.
 
@@ -152,6 +173,10 @@ with cloud fallback (0011), and the base reopened (0009).
 ## Conventions
 
 - Decisions are ADRs and are immutable once accepted. To change one, supersede it.
+- ADR status values, numbering and the template: [adr/README.md](adr/README.md).
+- Tests live in `tests/`, mirroring the tool they cover, and every module has one
+  ([ADR-0017](adr/0017-tests-live-in-tests.md)). The suite is standard-library
+  `unittest`, so nothing has to be installed to run it.
 - `docs/architecture/` describes how the system works; `docs/adr/` describes why.
 - Superseded documents stay in the tree. The record of a decision that turned out
   to be conditional is more useful than a tidy tree.

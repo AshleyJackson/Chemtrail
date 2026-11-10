@@ -5,7 +5,7 @@ from datetime import timedelta
 from dataclasses import replace
 
 from aios_release import gates
-from tests.factories import BASE, boots, build, digest, hardware, image, manifest, promotion
+from tests.release.factories import BASE, boots, build, digest, hardware, image, manifest, promotion
 
 
 class GateTests(unittest.TestCase):

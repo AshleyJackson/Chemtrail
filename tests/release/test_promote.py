@@ -7,7 +7,7 @@ from datetime import timedelta
 from aios_release import promote
 from aios_release.manifest import ManifestError, Rollout, format_time
 from aios_release.signing import DevHmacSigner
-from tests.factories import BASE, boots, build, digest, hardware, image, manifest, promotion
+from tests.release.factories import BASE, boots, build, digest, hardware, image, manifest, promotion
 
 SIGNER = DevHmacSigner(b"test-key", key_id="test")
 

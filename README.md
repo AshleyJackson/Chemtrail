@@ -23,6 +23,7 @@ ci/
 .github/workflows/         build → check → boot-test → hw-test → promote
 channels/                  the pointers; files appear on first promotion
 tools/release/             promotion, gates, signing seam, device-side resolution
+tests/                     the whole suite, mirroring tools/ (ADR-0017)
 image/greenboot/           required and wanted health checks
 docs/                      ADRs and architecture
 ```
@@ -30,8 +31,9 @@ docs/                      ADRs and architecture
 ## Try it
 
 ```bash
-# Release logic, no image needed:
-python -m unittest discover -s tools/release/tests -t tools/release
+# Everything, no image needed. The whole suite is stdlib unittest:
+PYTHONPATH=tools/release python -m unittest discover -s tests -t .
+
 PYTHONPATH=tools/release python -m aios_release demo --out .demo
 
 # Show what a device would decide:
