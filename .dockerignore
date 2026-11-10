@@ -1,0 +1,12 @@
+# Anything the image build does not read.
+.git
+.github
+docs
+tools
+.demo
+.evidence
+build
+dist
+__pycache__
+*.pyc
+README.md

@@ -39,7 +39,7 @@ Each build records:
 
 | Field | Where | Example |
 |-------|-------|---------|
-| `build_id` | image label, immutable | `2026.11.10+g1a2b3c4d` |
+| `build_id` | image label, immutable | `2026.11.10+g1a2b3c4d.r42` |
 | `source_commit` | image label | `1a2b3c4d…` |
 | `base_digest` | image label | `sha256:…` |
 | `nvidia_branch` | image label | `620` |
@@ -56,7 +56,9 @@ digest.
 
 Versioning:
 
-- Nightly `build_id`: `YYYY.MM.DD+g<sha7>`. Nightlies have no release.
+- Nightly `build_id`: `YYYY.MM.DD+g<sha7>.r<run>`. The run number is what keeps a
+  cron rebuild of an unchanged commit distinguishable from the push build. Every
+  build identity therefore maps to exactly one digest.
 - Stable `version`: `MAJOR.MINOR.PATCH`, assigned when the digest is promoted.
 - Release tag: `v` + that version, pinned to the **build** commit, not to a merge
   commit. `git checkout v1.4.0` therefore lands on the exact source that produced
@@ -66,9 +68,22 @@ Versioning:
 
 | Channel | Source | Promotion gate | Cadence | Support |
 |---------|--------|----------------|---------|---------|
-| `nightly` | every `master` build | image builds, boots in QEMU, shell reaches ready | per commit, plus a nightly cron | none |
-| `weekly` | nightly digest with ≥ 7 days and ≥ 5 successful boots | QEMU boot matrix, no known P1 | weekly | none |
-| `stable` | weekly digest | full hardware matrix on self-hosted GPU, 5% rollout for 7 days with no elevated rollback rate | monthly | until next stable + 1 |
+| `nightly` | every `master` build | image builds, `bootc container lint` passes | per build, plus a nightly cron | none |
+| `weekly` | digest that entered nightly ≥ 7 days ago | ≥ 5 passing boots, latest boot passed, no known P1 | weekly | none |
+| `stable` | digest that entered weekly ≥ 7 days ago | ≥ 5 boots, a GPU pass with `cuInit` succeeding, 5% rollout for 7 days | monthly | until next stable + 1 |
+
+Two honest substitutions are in force until the self-hosted runners exist, and
+they are visible in `GATES` rather than hidden in prose:
+
+- **Nightly does not boot.** A hosted runner has no KVM, so nightly accepts the
+  static `bootc container lint` result. That is weaker than the published
+  promise, and it is why weekly still requires five real boots. Raise
+  `nightly.min_boot_passes` to 1 — and delete the image-check requirement — once
+  `boot-test.yml` has a runner.
+- **Weekly and stable cannot promote without boot and GPU evidence.** If no
+  runner produces it, the channel simply stops advancing. That is the intended
+  failure: a channel that moves on missing evidence is worse than one that
+  stalls.
 
 All three are user-selectable. They must be presented by what they promise, not by
 name — "weekly" means nothing to someone who has never thought about release
@@ -85,6 +100,28 @@ by roughly three weeks" is a sentence users can plan around.
 
 Gates are **recorded as evidence against a digest**, not inferred. A promotion
 fails if the evidence for that exact digest is missing or stale.
+
+| Kind | Producer | Means |
+|------|----------|-------|
+| `build` | `build.yml` | the image built, pushed, with provenance |
+| `image` | `check.yml` | `bootc container lint` passed |
+| `boot` | `boot-test.yml` | the image reached multi-user in QEMU |
+| `hw` | `hw-test.yml` | the driver loaded and `cuInit` succeeded on a GPU |
+| `promotion` | `promote.yml` | a pointer moved to this digest |
+
+**Soak is measured from the `promotion` record, never from the channel pointer.**
+The nightly pointer moves on every commit, so "the digest nightly points at is
+seven days old" is never true, and a gate written that way would deadlock weekly
+promotion permanently. The first implementation of these gates did exactly that;
+`test_weekly_uses_promotion_evidence_not_the_moved_pointer` is the regression
+test. The same reasoning applies to stable: it asks when this digest entered
+weekly, not what weekly points at now.
+
+Evidence is a CI artefact (`.evidence/`, 90-day retention), not repository
+content. Promotion runs download recent `evidence-*` artefacts from the build,
+check, boot, hardware and promotion workflows, flatten them into `.evidence/`, and
+evaluate. No evidence is committed, which keeps `master` a single content
+lineage.
 
 ## 5. Promotion mechanism
 
@@ -129,10 +166,11 @@ A few hundred bytes, served over HTTPS, `ETag`-cached:
   "channel": "stable",
   "digest": "sha256:9f2c…",
   "version": "1.4.0",
-  "build_id": "2026.11.10+g1a2b3c4d",
+  "build_id": "2026.11.10+g1a2b3c4d.r42",
+  "source_commit": "1a2b3c4d…",
   "release": "v1.4.0",
   "created": "2026-11-10T00:00:00Z",
-  "rollout": { "percentage": 5, "seed": "2026-11-r3" },
+  "rollout": { "percentage": 5, "seed": "2026-11-9f2c", "started": "2026-11-10T00:00:00Z" },
   "min_source_version": "1.2.0",
   "notes_url": "https://github.com/ORG/REPO/releases/tag/v1.4.0",
   "supersedes": ["sha256:1a2b…"],
@@ -146,10 +184,20 @@ Rules:
   GitHub's immutability protects releases, not this pointer. Verification failure
   means no update, and a visible error.
 - Devices pull **by digest**, not by tag. Tags are for humans and for `podman`.
-- `rollout` is optional. When absent, 100%.
-- `supersedes` lets us withdraw a bad release without republishing it.
+- `rollout` is optional. When absent, 100%. `started` is required whenever there
+  is a percentage: widening to 100% has to know when the soak began, and asking
+  git for that would make CI reconstruct history the file can simply carry.
+- **`supersedes` means withdrawn**, not "the digest this one replaced". The
+  promotion chain lives in git; conflating the two makes every digest nightly
+  ever moved past look unsafe to promote, which stops the pipeline at the first
+  weekly promotion.
+- `source_commit` is the build commit, so a release tag can point at the exact
+  source that produced the shipped bytes without a lookup.
 - The file is committed by CI and carries a signed commit. Devices still verify
   the embedded signature, because they must not trust GitHub's identity.
+- The signature covers the **canonical JSON** of the document minus the signature
+  field — sorted keys, no insignificant whitespace. Reformatting the file cannot
+  invalidate it, and the client re-derives the payload from what it parsed.
 
 ### Promotion as a state transition
 
@@ -246,9 +294,15 @@ change, and it must be feature-detected per backend.
 ### Deterministic staged rollout
 
 ```python
-bucket = blake2b(machine_id + seed, digest_size=4).int % 100
+material = machine_id.encode() + b"\x00" + seed.encode()
+bucket = int.from_bytes(blake2b(material, digest_size=4).digest(), "big") % 100
 eligible = bucket < rollout_percentage
 ```
+
+The NUL separator matters: plain concatenation lets `ab` + `c` and `a` + `bc`
+produce the same bucket, which is harmless here only by luck. blake2b is in the
+standard library, which means the update client needs no crypto dependency to
+answer "am I in this rollout".
 
 No telemetry, no accounts, no server-side device registry. The same device always
 makes the same decision for the same seed, and a new seed re-rolls the population.
@@ -281,11 +335,22 @@ updates, and it must work offline.
 
 | Workflow | Trigger | Runner | Produces |
 |----------|---------|--------|----------|
-| `build.yml` | push to `master`, nightly cron | hosted | OCI image, signed, pushed by digest |
-| `boot-test.yml` | after build | self-hosted with KVM | boot evidence for a digest |
-| `hw-test.yml` | after build | self-hosted with GPU | driver + tokens/s evidence |
-| `promote.yml` | schedule, manual | hosted | channel file commit, signed tag, release |
-| `emergency.yml` | manual, two approvals | hosted | expedited promotion past soak |
+| `build.yml` | push to `master`, nightly cron | hosted | OCI image, signed, pushed by digest; build evidence |
+| `check.yml` | after build | hosted | `bootc container lint`; image evidence |
+| `boot-test.yml` | after build | self-hosted with KVM | boot evidence (`KVM_RUNNER=true`) |
+| `hw-test.yml` | after build | self-hosted with GPU | driver + `cuInit` evidence (`GPU_RUNNER=true`) |
+| `promote.yml` | after build, schedule, manual | hosted | channel file commit, signed tag, release |
+
+There is no separate `emergency.yml`. The emergency lane is an input to
+`promote.yml` — it skips soak, still requires the hardware gate, and records two
+approvers in the promotion commit. One workflow that can write the pointer is
+easier to protect than two.
+
+The self-hosted jobs are gated on repository variables rather than left to queue
+forever. An unset variable produces a skipped job, which is honest; a missing
+runner produces a queued job nobody notices. Self-hosted runners attached to a
+public repository are also a security boundary: only run them where untrusted
+pull requests cannot reach the runner.
 
 Sketch of the core build:
 
@@ -464,3 +529,41 @@ than discovering it when a release ships broken.
   enough to mean something rather than being a nightly with a different name.
 - Image and release-asset retention numbers versus storage cost.
 - Whether to support offline update media for air-gapped devices.
+- Whether `RELEASE_TOKEN` is a fine-grained PAT or a GitHub App. The former is
+  quick and ties the pipeline to one person; the latter is the right answer and
+  needs an app installation first.
+
+## 14. Implementation status (2026-11-10)
+
+**Built and tested**
+
+- `tools/release/` — gates, candidate selection, promotion, widening,
+  withdrawal, canonical signing payload, device-side resolution, and a
+  four-week simulation. 89 unit tests, all passing.
+- `Containerfile` — pinned base, NVIDIA kmod built against the image's own
+  kernel and stripped, session libraries, greenboot checks, stock timer masked.
+- `ci/promote.sh` and the five workflows — build, static check, boot, hardware,
+  promotion.
+- `channels/` with the contract documented and no fabricated pointers.
+
+**Not verified, deliberately**
+
+- `ci/boot-test.sh` and `ci/hw-test.sh` have never run: there is no KVM or GPU
+  runner. They are marked unverified in the files themselves.
+- No image has been built by this repository's CI. The NVIDIA build step *was*
+  executed against the pinned base image on 2026-11-10 and produced
+  `kmod-nvidia-7.3.3-300.fc45…` plus a surviving `nvidia.ko.xz` after the
+  toolchain was removed. The rest of the Containerfile is unexercised.
+- No cosign key exists. The HMAC signer is a local stub and must never ship.
+
+**Facts that corrected earlier sections, found by running things**
+
+- greenboot is **not** installed in `fedora-bootc:45`; it is a separate package.
+- `bootc-fetch-apply-updates.timer` is **enabled** in the base image, which
+  confirms ADR-0016 §5 as a real default rather than a theoretical risk.
+- The base image kernel lags Fedora updates (7.2.15 in the image, 7.3.3 in
+  updates), so `kernel-devel-matched` upgrades the kernel. The module build must
+  read the kernel version *after* installing, or it fails against headers that no
+  longer exist.
+- All 14 session-runtime packages named in the Containerfile resolve for Fedora
+  45, and RPMFusion has both `free` and `nonfree` repositories for 45.

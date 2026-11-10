@@ -1,0 +1,57 @@
+name: check
+
+# The gate a hosted runner can actually run: static validation of the image.
+# `bootc container lint` is a real check, but it is not a boot. Nightly accepts
+# it; weekly requires boot evidence from boot-test.yml.
+on:
+  workflow_run:
+    workflows: ["build"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+jobs:
+  image:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch build evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .evidence
+          gh run download "${{ github.event.workflow_run.id }}" \
+            --pattern 'evidence-build' --dir .evidence
+          find .evidence -name '*.json' -exec mv -n {} .evidence/ \;
+          digest="$(python -c 'import glob,json; print(json.load(open(glob.glob(".evidence/*.json")[0]))["digest"])')"
+          echo "digest=${digest}" >> "$GITHUB_ENV"
+
+      - name: lint the image
+        run: |
+          sudo podman login ghcr.io \
+            -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
+          sudo podman pull "ghcr.io/${{ github.repository }}@${digest}"
+          sudo podman run --rm "ghcr.io/${{ github.repository }}@${digest}" \
+            bootc container lint
+
+      - name: record image evidence
+        env:
+          PYTHONPATH: tools/release
+        run: |
+          python -m aios_release record --kind image \
+            --digest "${digest}" \
+            --commit "${{ github.event.workflow_run.head_sha }}" \
+            --check lint=pass \
+            --out ".evidence/image-${GITHUB_RUN_ID}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-image
+          path: .evidence/image-*.json
+          retention-days: 90

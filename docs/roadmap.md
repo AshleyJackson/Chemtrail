@@ -12,6 +12,15 @@ was wrong: it spent the budget on the solved part of the problem.
 **Goal:** remove the two assumptions that could still invalidate everything. The
 base is decided (ADR-0013); what remains is the interface and the image.
 
+- [x] Release pipeline: promotion by digest, gates over recorded evidence,
+      signed channel files, and a four-week simulation that runs without an
+      image (`tools/release`). Built before the image because its decisions are
+      the ones a wrong guess makes expensive.
+- [ ] Make the boot gate real: a KVM runner, so nightly means "it starts" and
+      weekly accumulates genuine boots. Until then nightly accepts a static
+      `bootc container lint`.
+- [ ] Make the hardware gate real: a GPU runner, without which stable cannot
+      advance.
 - [ ] Compositor spike: `wlroots` versus `Smithay`, on summon latency, XWayland
       compatibility, fractional scaling, multi-monitor hotplug, input methods.
 - [ ] Decide build-versus-fork for the compositor.

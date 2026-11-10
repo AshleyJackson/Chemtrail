@@ -1,0 +1,56 @@
+name: hw-test
+
+# The gate that cannot be automated on hosted runners: a real GPU.
+#
+# Needs a self-hosted runner with an NVIDIA GPU, the container toolkit and CDI.
+# Set the repository variable GPU_RUNNER=true once it exists. Without this gate,
+# stable promotions are impossible — by design, because the NVIDIA module is the
+# most likely thing to break.
+on:
+  workflow_run:
+    workflows: ["build"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+jobs:
+  gpu:
+    if: vars.GPU_RUNNER == 'true' && github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, linux, x64, gpu-nvidia]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch build evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .evidence
+          gh run download "${{ github.event.workflow_run.id }}" \
+            --pattern 'evidence-build' --dir .evidence
+          find .evidence -name '*.json' -exec mv -n {} .evidence/ \;
+          digest="$(python3 -c 'import glob,json; print(json.load(open(glob.glob(".evidence/*.json")[0]))["digest"])')"
+          echo "digest=${digest}" >> "$GITHUB_ENV"
+
+      - name: initialise the GPU from inside the image
+        run: bash ci/hw-test.sh "ghcr.io/${{ github.repository }}@${digest}"
+
+      - name: record hardware evidence
+        env:
+          PYTHONPATH: tools/release
+        run: |
+          python3 -m aios_release record --kind hw \
+            --digest "${digest}" \
+            --commit "${{ github.event.workflow_run.head_sha }}" \
+            --check gpu_context=pass \
+            --check nvidia_module=pass \
+            --out ".evidence/hw-${GITHUB_RUN_ID}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-hw
+          path: .evidence/hw-*.json
+          retention-days: 90

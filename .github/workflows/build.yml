@@ -1,0 +1,105 @@
+name: build
+
+# One lineage: every commit to master produces exactly one image. Nothing else
+# introduces content into the channel chain (ADR-0015 §1).
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'channels/**'
+      - 'docs/**'
+      - 'tools/release/**'
+      - '.github/workflows/**'
+      - '**/*.md'
+  schedule:
+    # A daily rebuild catches upstream package drift even on a quiet repository.
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: build-master
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  BASE_DIGEST: sha256:0b34d5a62123eee7b18b34489e683b24850b2676c2ed7816cbbb38440914f559
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      build_id: ${{ steps.identity.outputs.build_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build identity
+        id: identity
+        run: |
+          build_id="$(date -u +%Y.%m.%d)+g${GITHUB_SHA::7}.r${GITHUB_RUN_NUMBER}"
+          echo "build_id=${build_id}" >> "$GITHUB_OUTPUT"
+          echo "Building ${build_id}" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: mode=max
+          sbom: true
+          # A convenience tag. The digest is the identity; nothing follows the tag.
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          build-args: |
+            BUILD_ID=${{ steps.identity.outputs.build_id }}
+            SOURCE_COMMIT=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            aios.build.id=${{ steps.identity.outputs.build_id }}
+            aios.build.source_commit=${{ github.sha }}
+            aios.base.digest=${{ env.BASE_DIGEST }}
+
+      - name: sign the image
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          if [ -z "${COSIGN_PRIVATE_KEY:-}" ]; then
+            echo "::warning::COSIGN_PRIVATE_KEY is unset; the image is unsigned and must not be promoted"
+            exit 0
+          fi
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
+            "${IMAGE}@${{ steps.build.outputs.digest }}"
+
+      - name: write build evidence
+        env:
+          PYTHONPATH: tools/release
+        run: |
+          mkdir -p .evidence
+          python -m aios_release record --kind build \
+            --digest "${{ steps.build.outputs.digest }}" \
+            --build-id "${{ steps.identity.outputs.build_id }}" \
+            --commit "${{ github.sha }}" \
+            --label "base_digest=${BASE_DIGEST}" \
+            --out ".evidence/build-${GITHUB_RUN_ID}.json"
+          echo "digest ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-build
+          path: .evidence/*.json
+          retention-days: 90

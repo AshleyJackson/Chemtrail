@@ -3,8 +3,9 @@
 An assistant-first operating system: the user states intent, the system acts, and
 applications are windows rather than the primary interface.
 
-**Status:** pre-implementation. Base platform settled as **Fedora bootc**. No code
-exists yet.
+**Status:** scaffold implemented. Base platform settled as **Fedora bootc**; the
+release pipeline exists as code and runs end to end on dummy digests. No
+compositor, no shell, and no published image yet.
 
 ## What this project is
 
@@ -65,6 +66,24 @@ with a user-chosen restart policy (0016). ADR-0014 records what the base change
 dissolved.
 
 ## Changelog of the documentation
+
+**2026-11-10, eighth revision.** The release design became code.
+
+- `tools/release/` implements the gates, selection, promotion, widening,
+  withdrawal, canonical signing payload, and device-side resolution. 89 tests.
+- **Soak is measured from a recorded promotion, not from the channel pointer.**
+  The first implementation deadlocked weekly behind the always-moving nightly
+  pointer; the regression test and the reasoning are in
+  [release-engineering.md](architecture/release-engineering.md) §4.
+- **`supersedes` means withdrawn**, not "the previous digest". Conflating them
+  made every digest nightly had moved past look unsafe to promote.
+- The Containerfile builds the NVIDIA module against the image's own kernel and
+  strips the toolchain. Two upstream facts were wrong in these docs and are
+  corrected: greenboot is not in the base image, and the stock update timer is
+  enabled by default.
+- Nightly currently accepts `bootc container lint` instead of a real boot,
+  because a hosted runner has no KVM. Weekly still requires boots, so the weaker
+  gate cannot leak into a slower channel.
 
 **2026-11-10, seventh revision.** Channel storage and branch model revised.
 
@@ -144,6 +163,8 @@ with cloud fallback (0011), and the base reopened (0009).
 | Question | Blocks | Owner |
 |----------|--------|-------|
 | Self-hosted GPU runner for the hardware gate | Any automated promotion to stable | — |
+| Self-hosted KVM runner for the boot gate | Any automated promotion to weekly | — |
+| `RELEASE_TOKEN` with permission to push to `channels/**` | Any automated promotion | — |
 | Channel URL, and when to front GitHub with our own domain | Update resolution | — |
 | Deferral ceiling and escalation for security updates | ADR-0016 follow-up | — |
 | Compositor: build on `wlroots`, fork Sway/niri, or `Smithay` | Shell v0 | — |

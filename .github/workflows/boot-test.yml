@@ -1,0 +1,56 @@
+name: boot-test
+
+# The first gate that actually starts the operating system.
+#
+# Needs a self-hosted runner with /dev/kvm. Set the repository variable
+# KVM_RUNNER=true once that runner is registered; until then the job is skipped
+# rather than queued forever. Self-hosted runners on a public repository are a
+# security boundary: only run this where untrusted pull requests cannot reach the
+# runner.
+on:
+  workflow_run:
+    workflows: ["build"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+
+jobs:
+  boot:
+    if: vars.KVM_RUNNER == 'true' && github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, linux, x64, kvm]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: fetch build evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .evidence
+          gh run download "${{ github.event.workflow_run.id }}" \
+            --pattern 'evidence-build' --dir .evidence
+          find .evidence -name '*.json' -exec mv -n {} .evidence/ \;
+          digest="$(python3 -c 'import glob,json; print(json.load(open(glob.glob(".evidence/*.json")[0]))["digest"])')"
+          echo "digest=${digest}" >> "$GITHUB_ENV"
+
+      - name: boot the image
+        run: bash ci/boot-test.sh "ghcr.io/${{ github.repository }}@${digest}"
+
+      - name: record boot evidence
+        env:
+          PYTHONPATH: tools/release
+        run: |
+          python3 -m aios_release record --kind boot \
+            --digest "${digest}" \
+            --commit "${{ github.event.workflow_run.head_sha }}" \
+            --check multi_user=pass \
+            --out ".evidence/boot-${GITHUB_RUN_ID}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: evidence-boot
+          path: .evidence/boot-*.json
+          retention-days: 90

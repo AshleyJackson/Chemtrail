@@ -1,0 +1,9 @@
+# Channel pointers are the highest-value path in the repository: whoever can
+# write them can redirect every installed device. Reviewers are required.
+/channels/ @AshleyJackson
+
+# The workflows that write channels and sign artefacts.
+/.github/workflows/ @AshleyJackson
+
+# The promotion logic itself.
+/tools/release/ @AshleyJackson

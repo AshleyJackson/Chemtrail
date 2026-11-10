@@ -1,0 +1,5 @@
+# The container build runs these files under Linux; a CRLF shebang would fail
+# with an error that points nowhere useful.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

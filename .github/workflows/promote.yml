@@ -1,0 +1,116 @@
+name: promote
+
+# Writes channels/*.json. It never builds, and it never touches the image.
+on:
+  workflow_run:
+    # Nightly promotion follows each successful build. `check` is also listed
+    # because image evidence arrives after the build: if promotion beats the
+    # check, it does nothing and the check completion retries it. Promotion is
+    # idempotent, so the second attempt is free.
+    workflows: ["build", "check"]
+    types: [completed]
+  schedule:
+    - cron: '0 6 * * 1'    # weekly, Mondays 06:00 UTC
+    - cron: '0 7 1 * *'    # stable, 1st of the month 07:00 UTC
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel to promote
+        type: choice
+        options: [nightly, weekly, stable]
+        required: true
+      digest:
+        description: Override the digest (normally selected from evidence)
+        type: string
+        required: false
+      emergency:
+        description: Emergency lane (skips soak, needs two approvers)
+        type: boolean
+        default: false
+      approvers:
+        description: Comma-separated approver names for the emergency lane
+        type: string
+        required: false
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: read
+  actions: read
+  id-token: write
+
+jobs:
+  promote:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A ruleset protects channels/**. Pushing there needs a token with
+          # bypass permission, so RELEASE_TOKEN must be present for an automated
+          # promotion to succeed. Without it the push is rejected, loudly.
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          fetch-depth: 0
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: decide the channel
+        id: channel
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            channel="${{ inputs.channel }}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            channel="nightly"
+          elif [ "${{ github.event.schedule }}" = "0 6 * * 1" ]; then
+            channel="weekly"
+          else
+            channel="stable"
+          fi
+          echo "channel=${channel}" >> "$GITHUB_OUTPUT"
+          echo "Promoting **${channel}**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: collect evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .evidence .runs
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            gh run download "${{ github.event.workflow_run.id }}" \
+              --pattern 'evidence-*' --dir ".runs/trigger-${{ github.event.workflow_run.id }}" || true
+          fi
+          for workflow in build check boot-test hw-test promote; do
+            gh run list --workflow "$workflow" --status success --limit 40 \
+              --json databaseId --jq '.[].databaseId' |
+            while read -r id; do
+              gh run download "$id" --pattern 'evidence-*' --dir ".runs/${workflow}-${id}" || true
+            done
+          done
+          find .runs -name '*.json' -exec mv -n {} .evidence/ \;
+          echo "evidence records: $(find .evidence -name '*.json' | wc -l)"
+          ls -1 .evidence | sed -n '1,40p'
+
+      - name: promote
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          CHANNEL: ${{ steps.channel.outputs.channel }}
+          CANDIDATE: ${{ inputs.digest }}
+          EMERGENCY: ${{ inputs.emergency && '1' || '0' }}
+          APPROVERS: ${{ inputs.approvers }}
+        run: |
+          git config user.name "aios-release[bot]"
+          git config user.email "aios-release[bot]@users.noreply.github.com"
+          bash ci/promote.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-promotion
+          path: .evidence/promotion-*.json
+          if-no-files-found: ignore
+          retention-days: 90

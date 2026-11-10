@@ -1,0 +1,10 @@
+# Evidence is a CI artefact, not repository content (see tools/release/README.md).
+.evidence/
+
+# Local output from the release tool, the demo, and the image build.
+.demo/
+build/
+dist/
+
+__pycache__/
+*.pyc
