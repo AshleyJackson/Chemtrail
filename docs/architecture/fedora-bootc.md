@@ -45,6 +45,11 @@ Rules:
 - **One desktop, deliberately.** COSMIC is the session (ADR-0018). Plasma and
   GNOME are not installed: a second desktop would double the session surface and
   reopen a UX question this project has already answered.
+- **One X server: Xwayland.** X11 applications run through Fedora's
+  `xorg-x11-server-Xwayland` inside COSMIC. No standalone X server and no X11
+  session ship ([ADR-0019](../adr/0019-no-xlibre.md)). The reason is ABI, not
+  taste: third-party drivers, including NVIDIA's, are built against Fedora's
+  server ABI, and a fork with its own ABI cannot load them.
 - **No compilers or `kernel-devel` in the final image.** If the module is built at
   build time, the toolchain does not ship. This keeps the image small and removes
   an attack surface.
@@ -221,6 +226,7 @@ commit -> CI build (Containerfile) -> sign image -> push to staging registry
 | MOK enrolment abandoned by users | No acceleration, confusing experience | One-screen explanation; detect and offer a retry path |
 | Image size grows unbounded | Slow updates, large downloads | Layer review each release; measure compressed size |
 | Fedora regression | Our release inherits it | Deliberate rebuild cadence, not continuous; test matrix |
+| Fedora drops or stops packaging Xwayland | No X11 path in the image; no fallback ships | Track each release; ADR-0019 reopens with the alternatives costed |
 | SELinux breaks the shell | Ships broken | Policy tests in CI; permissive only in developer mode |
 
 ## 12. Open decisions

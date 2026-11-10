@@ -63,6 +63,7 @@ differentiated, and none of it should consume the project.
 | [0016](adr/0016-update-application-policy.md) | Update application policy: two modes, no forced reboots | **Accepted** |
 | [0017](adr/0017-tests-live-in-tests.md) | Tests live in `tests/`, and everything has a test | **Accepted** |
 | [0018](adr/0018-cosmic-desktop-for-v1.md) | Ship COSMIC as the desktop environment for v1 | **Accepted** |
+| [0019](adr/0019-no-xlibre.md) | Do not ship XLibre, in any role | Rejected |
 
 Five ADRs define the product: inference is local-first with an explicit cloud
 route (0011), distribution is public (0012), the platform is Fedora bootc (0013),
@@ -72,8 +73,24 @@ and the assistant a layer-shell surface above it, superseding ADR-0010's
 commitment to a compositor we write. ADR-0014 records what the base change
 dissolved. ADR-0017 is process rather than product: it fixes where tests live and
 makes "everything has a test" a failing assertion instead of an intention.
+ADR-0019 is a rejection rather than a commitment: XLibre is out of the image, and
+Fedora's Xwayland stays the only X server.
 
 ## Changelog of the documentation
+
+**2026-11-10, eleventh revision.** XLibre rejected.
+
+- **ADR-0019 rejected.** XLibre was evaluated in both roles it could occupy and
+  dropped. It carries no Xwayland, so it cannot serve the COSMIC session, and its
+  driver ABI (videodrv 28, xinput 26) cannot load Fedora's drivers, including the
+  NVIDIA driver this OS exists to run (ABI 25.2).
+- **The decision is the measurement.** It builds on Fedora 45 — that was checked
+  by building it to completion — so the objection is the ABI wall and the missing
+  Wayland server, not whether the fork compiles.
+- **The X11 path is Fedora's Xwayland inside COSMIC**, and v1 has no legacy X11
+  session. If one is ever needed, the candidate is Fedora's Xorg, which shares the
+  driver's ABI; XLibre is not the fallback.
+- An in-progress `ci/build-xlibre.sh` was deleted rather than committed disabled.
 
 **2026-11-10, tenth revision.** COSMIC becomes the desktop.
 
