@@ -272,9 +272,12 @@ and what is on the disk.
 
 ## Follow-ups
 
-- Write the kickstart file and decide where `inst.ks=` is served from. The
-  medium will be served from the same host as the channel JSON, so this resolves
-  with the channel URL question in [docs/README.md](../README.md).
+- **Done 2026-11-11:** the kickstart is written — `install/aios-netinst.ks`,
+  pinned by digest to the first image CI published to GHCR, and validated against
+  pykickstart 3.77-1.fc45 (the F45 installer's parser). For one-off installs it
+  is served from raw.githubusercontent.com; permanent hosting resolves with the
+  channel URL question in [docs/README.md](../README.md), since the medium will
+  live on the same host as the channel JSON.
 - **Done 2026-11-11:** confirmed that Fedora 45's installer carries the `bootc`
   kickstart command — verified against pykickstart 3.77-1.fc45 from the F45
   repositories, not just the Rawhide demonstration in the announcement; see
@@ -292,5 +295,5 @@ and what is on the disk.
 - Re-test `bootc-installer` on each `bootc-image-builder` release, and adopt it if
   the `bootc container inspect` failure is fixed.
 - Decide the air-gapped artefact: built from a release, or not shipped.
-- Update [run/virtualbox.md](../run/virtualbox.md) with the network-install path
-  once it has been booted once.
+- Run the network install in a VM per [run/virtualbox.md](../run/virtualbox.md)
+  §7 and record what happened there, including how long the GHCR pull takes.

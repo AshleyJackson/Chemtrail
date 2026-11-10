@@ -10,8 +10,9 @@ Fedora's own netinst media plus a hosted kickstart that pulls the image from
 GitHub Container Registry — no installer ISO is built or published, because the
 first one came out at 3.42 GB against GitHub's 2 GiB per-asset limit. The desktop
 is COSMIC (ADR-0018) but is not in the image yet. The build workflow publishes an
-image to GHCR on every commit to `master`; it has never completed a publication,
-and why is recorded in the changelog below.
+image to GHCR on every commit to `master`; it has now published, and the hosted
+kickstart pins that first image by digest. What it took to get there — three
+workflow bugs and a re-pinned base — is recorded in the changelog below.
 
 ## What this project is
 
@@ -92,6 +93,32 @@ installer, the install medium carries no payload (Fedora's netinst plus a hosted
 kickstart), and the NVIDIA layer arrives after first boot.
 
 ## Changelog of the documentation
+
+**2026-11-11, fifteenth revision.** The first image was published to GHCR, and the kickstart now points at it.
+
+- **The build workflow needed two more fixes before it could publish.** First:
+  buildx looks for a `Dockerfile` by default, but this repository's build file is
+  named `Containerfile`, so every CI build died before building anything. Second:
+  the pinned base digest no longer resolved on quay.io — Fedora re-tags `45` at
+  point releases and quay garbage-collects manifests that no tag references, so a
+  digest pin there is a lease, not an anchor (now noted in the Containerfile). The
+  base was re-pinned to the current index digest of `fedora-bootc:45`, verified
+  resolvable by digest before pushing.
+- **The first image is published and anonymously pullable.** CI built from commit
+  9219567 and pushed it to `ghcr.io/ashleyjackson/chemtrail`; an anonymous token
+  fetches its manifest, which is what Anaconda in a fresh VM will do. The package
+  is public because the repository is public — no extra step was needed, but it
+  was checked rather than assumed.
+- **The hosted kickstart exists and validates.** `install/aios-netinst.ks` pins
+  that image by digest (the multi-arch index digest CI records and signs), sets
+  storage/locale/root password, and parses cleanly under pykickstart 3.77-1.fc45
+  with both `bootc` options recorded — source with its `registry:` transport
+  prefix, target without one, as this release requires.
+- **The VM recipe was corrected before running it.** The Fedora download URL in
+  the docs did not exist (the real one is on `/server/download`, under
+  `download.fedoraproject.org/pub/...`), and the VirtualBox command for a NAT
+  network was invented (`createnatnet`); 7.x uses `natnetwork add`, and a NIC set
+  to `natnetwork` must name its network or it silently gets the default.
 
 **2026-11-11, fourteenth revision.** ADR-0020 accepted; the install path becomes a network install.
 

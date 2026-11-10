@@ -146,16 +146,19 @@ Get-Content "$disks\serial.log" -Tail 80
 
 The install medium is Fedora's netinst ISO — we build nothing and host only a
 few-KB kickstart that tells Anaconda to pull the image from GHCR with its `bootc`
-command. The kickstart pins the image by digest; it lives in this repository as
-`install/aios-netinst.ks`, written once CI has published an image for it to pin
-(the build workflow publishes one on every commit to `master`).
+command. The kickstart lives in this repository as `install/aios-netinst.ks` and
+pins, by digest, the first image CI published (commit 9219567). Note that every
+new commit builds a new image, so this file lags HEAD until it is re-rendered —
+that rendering is what promotion does per channel (ADR-0020 follow-up), not
+something to do by hand for each test.
 
 ### 7.1 Get the media
 
-- **Fedora Server 45 netinst ISO** (~1 GB) from Fedora's own download page,
-  https://fedoraproject.org/fedora-server/ — the "netinstall" image. It is
-  published and mirrored by Fedora; it costs this project no storage and no
-  releases.
+- **Fedora Server 45 netinst ISO** (~1.2 GiB) from Fedora's own download page,
+  https://fedoraproject.org/server/download — the "Network Install" image for
+  x86_64 (the file is `Fedora-Server-netinst-x86_64-45-*.iso` under
+  `download.fedoraproject.org/pub/fedora/linux/releases/`). It is published and
+  mirrored by Fedora; it costs this project no storage and no releases.
 - **The kickstart**, served over HTTP. For a one-off test no hosting decision is
   needed:
 
@@ -176,12 +179,14 @@ Same as section 2, with two differences:
   reaches both:
 
   ```powershell
-  & $vbox createnatnet AI_OS-net --netname 192.168.56.0/24
-  & $vbox modifyvm $vm --nic1 natnetwork
+  & $vbox natnetwork add --netname AI_OS-net --network 192.168.56.0/24
+  & $vbox modifyvm $vm --nic1 natnetwork --nat-network1 AI_OS-net
   ```
 
-  The host gets an address in that subnet; `ipconfig` shows it if you serve the
-  kickstart locally.
+  (VirtualBox 7.x: the subcommand is `natnetwork add`, and a NIC set to
+  `natnetwork` must name its network with `--nat-networkN` or it uses the
+  default.) The host gets an address in that subnet; `ipconfig` shows it if you
+  serve the kickstart locally.
 
 ### 7.3 Install with inst.ks=
 
