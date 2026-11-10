@@ -21,11 +21,14 @@ base is decided (ADR-0013); what remains is the interface and the image.
       `bootc container lint`.
 - [ ] Make the hardware gate real: a GPU runner, without which stable cannot
       advance.
-- [ ] Compositor spike: `wlroots` versus `Smithay`, on summon latency, XWayland
-      compatibility, fractional scaling, multi-monitor hotplug, input methods.
-- [ ] Decide build-versus-fork for the compositor.
+- [ ] COSMIC integration spike (ADR-0018): does a layer-shell overlay take
+      keyboard focus, summon over a fullscreen application, and receive the window
+      list? Measure summon latency against the 50 ms bar. The rest of the
+      interface plan depends on this answer.
+- [ ] Decide the summon gesture against COSMIC's own launcher, which wants the
+      same keys.
 - [ ] Produce a minimal bootable Fedora bootc image: base, Mesa, NVIDIA module
-      built at image time, no desktop environment.
+      built at image time, COSMIC session behind `greetd`.
 - [ ] Prove the image boots, loads the driver, and updates via `bootc upgrade`
       with `greenboot` rolling back a deliberately broken deployment.
 - [ ] Decide the minimum local model and recommended VRAM now that cloud routing
@@ -39,12 +42,13 @@ of work.
 
 ## Phase 1 — Interaction prototype on an existing desktop (4 weeks)
 
-**Goal:** learn whether the interaction model is actually good, before building a
-compositor to deliver it.
+**Goal:** learn whether the interaction model is actually good, on a desktop that
+already works.
 
-- Layer-shell assistant surface on an existing atomic base.
+- Layer-shell assistant surface on the COSMIC session, on an existing atomic base.
 - Wired to a local `llama.cpp` CPU model and a cloud route behind the router.
-- Window context from `wlr-foreign-toplevel-management` only.
+- Window context from `foreign-toplevel` and COSMIC's toplevel protocols, and
+  nothing privileged.
 - Tool execution through the sandbox, three-tier permissions.
 - Put it in front of at least five people who did not build it.
 
@@ -58,22 +62,29 @@ compositor to deliver it.
 **Why here:** this is the cheapest possible test of the product's premise. If it
 fails, the loss is four weeks rather than a year.
 
-## Phase 2 — Shell v0 (3–4 months)
+## Phase 2 — Assistant surface v0 (2–3 months)
 
-**Goal:** the assistant-first session, as its own compositor.
+**Goal:** the assistant as the surface the user actually addresses, on COSMIC. The
+compositor work that dominated this phase is gone (ADR-0018); what replaces it is
+integration.
 
-- Compositor per ADR-0010, assistant surface as the primary surface.
-- Intent-driven window management.
-- XWayland for legacy apps; documented list of what runs.
-- Session lock, power management, notifications, portals.
-- Accessibility baseline — decided in Phase 1, not deferred to 1.0.
+- The assistant surface as a primary, summonable overlay, implementing the
+  interaction spec from Phase 1.
+- Intent-driven window management through COSMIC's protocols, with an explicit
+  list of what it cannot do.
+- Context acquisition: window, selection and session state, with permissions.
+- Desktop integration: the default app set, shortcuts, and a look that is not
+  indistinguishable from stock COSMIC.
+- Accessibility: verify the inherited COSMIC baseline against Phase 1's decision,
+  and close the gaps that affect the overlay itself.
 
 **Exit criteria:**
 
-- A full working day without falling back to a comparison session.
-- Ordinary applications run and behave.
-- Suspend/resume, multi-monitor, fractional scaling, and input methods work on
-  the supported GPU.
+- A full working day without falling back to an unassisted desktop for common
+  tasks.
+- The assistant is reached for before the launcher in the common cases.
+- Suspend/resume, multi-monitor, fractional scaling and input methods work as
+  inherited from COSMIC and verified on the supported GPU.
 
 ## Phase 3 — Local inference at interactive speed
 
@@ -90,13 +101,17 @@ fails, the loss is four weeks rather than a year.
 - Power-on to first token under 15 seconds.
 - A model too large for free VRAM returns an explanation, not a crash.
 
-## Phase 4 — Public beta as a session (2 months)
+## Phase 4 — Public beta as an image (2 months)
 
-**Goal:** strangers can install the shell on their own machine.
+**Goal:** strangers can install the whole thing on their own machine.
 
-- Session packaged for the chosen base, with an installer path that works without
-  a wiki.
-- Update channel for the session, independent of the OS.
+The session and the OS are one artefact now (ADR-0018), so the beta is an image
+rather than a session sitting on someone else's distribution.
+
+- Image built with `bootc-image-builder`, and an install path that works without a
+  wiki.
+- Update channel for the image (ADR-0015), with `channels/` populated by real
+  promotions for the first time.
 - Recovery instructions tested by someone who has not read the design docs.
 - Supported hardware matrix published.
 
@@ -105,18 +120,19 @@ fails, the loss is four weeks rather than a year.
 - Ten people install it unaided.
 - No install requires a terminal.
 
-**Why before the OS:** this is the product, shippable without owning a
-distribution. If it succeeds, Phase 5 is justified. If it does not, Phase 5 was
-never worth starting.
+**Why here:** this is the first release a stranger can run. If it succeeds,
+Phase 5 is justified; if it does not, the support burden of Phase 5 was never
+worth taking on.
 
 ## Phase 5 — Own the OS (4–6 months)
 
 **Goal:** ship our own image, only after the shell has earned it.
 
 - Production bootc image: pinned base, NVIDIA module built at image time, SELinux
-  enforcing, no desktop environment.
+  enforcing, COSMIC session.
 - Installer ISO from `bootc-image-builder` with MOK enrolment in first-run.
-- `greenboot` health checks for compositor, `agentd`, and GPU context creation.
+- `greenboot` health checks for the COSMIC session, `agentd`, and GPU context
+  creation.
 - Signed images and signed release artefacts; device-side verification mandatory.
 - Recovery: boot the previous deployment, and document it for a non-expert.
 - Migration path for Phase 4 users.
@@ -146,7 +162,8 @@ routing.
 | Risk | Impact | Likelihood | Retired by | Trigger to act |
 |------|--------|------------|------------|----------------|
 | The interaction model is not compelling | Product has no reason to exist | Medium | Phase 1 | Users do not return on day two |
-| Compositor takes far longer than modelled | 6–12 month slip | High | Phase 0 spike, Phase 2 | Phase 2 exceeds 4 months |
+| A layer-shell overlay cannot hold focus on COSMIC | Product degrades to an assistant window | Medium | Phase 0 COSMIC spike | Summon fails over fullscreen, or focus is lost |
+| COSMIC churn breaks the integration | Session breaks on a desktop upgrade | Medium | Pinned images, release gates | An Epoch upgrade needs a local patch |
 | Accessibility deferred forever | Excludes users; blocks a credible public release | High | Phase 1 decision | Any release without a plan |
 | Base kernel and RPMFusion NVIDIA module diverge | Image builds without acceleration, or not at all | Medium | Phase 0 image, CI build | Any build where the module does not match the base kernel |
 | Local latency below usable on target hardware | Assistant feels broken | Medium | Phase 3 | < 15 tok/s on reference model |
@@ -158,6 +175,6 @@ routing.
 
 ## Sequencing note
 
-Phases 1 and 4 are deliberately shippable without owning an OS. That is the point:
-the product's value is testable at every stage, and the expensive, undifferentiated
-work is deferred until the differentiated work has proved itself.
+Phase 1 is deliberately shippable without owning an OS: the product's value is
+testable at every stage, and the expensive, undifferentiated work is deferred
+until the differentiated work has proved itself.

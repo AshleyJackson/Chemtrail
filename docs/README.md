@@ -4,8 +4,9 @@ An assistant-first operating system: the user states intent, the system acts, an
 applications are windows rather than the primary interface.
 
 **Status:** scaffold implemented. Base platform settled as **Fedora bootc**; the
-release pipeline exists as code and runs end to end on dummy digests. No
-compositor, no shell, and no published image yet.
+release pipeline exists as code and runs end to end on dummy digests. The desktop
+is COSMIC (ADR-0018); the assistant surface and a published image do not exist
+yet.
 
 ## What this project is
 
@@ -21,7 +22,9 @@ differentiated, and none of it should consume the project.
 
 1. [Fedora bootc platform](architecture/fedora-bootc.md) — how the OS is built,
    updated, signed, and installed.
-2. [ADR-0010](adr/0010-assistant-first-shell.md) — the shell is the product.
+2. [ADR-0018](adr/0018-cosmic-desktop-for-v1.md) — COSMIC is the desktop, and the
+   assistant is the surface above it. [ADR-0010](adr/0010-assistant-first-shell.md)
+   argued the opposite and is superseded; read it for the trade-off, not the plan.
 3. [AI runtime](architecture/ai-runtime.md) — control plane, model store, routing,
    tool execution.
 4. [ADR-0014](adr/0014-nvidia-and-workloads-on-glibc.md) — GPU and workload
@@ -51,7 +54,7 @@ differentiated, and none of it should consume the project.
 | [0007](adr/0007-model-store.md) | Content-addressed model store | Proposed |
 | [0008](adr/0008-tool-sandbox.md) | Sandbox tool execution with bwrap + seccomp | Proposed |
 | [0009](adr/0009-reopen-base-selection.md) | Reopen the base platform decision | Accepted — resolved by 0013 |
-| [0010](adr/0010-assistant-first-shell.md) | Assistant-first shell is the interface | **Accepted** |
+| [0010](adr/0010-assistant-first-shell.md) | Assistant-first shell is the interface | Superseded by 0018 |
 | [0011](adr/0011-local-first-cloud-optional.md) | Local-first inference, cloud optional | **Accepted** |
 | [0012](adr/0012-public-product-scope.md) | Public product scope | **Accepted** |
 | [0013](adr/0013-adopt-fedora-bootc.md) | Adopt Fedora bootc as the base | **Accepted** |
@@ -59,15 +62,36 @@ differentiated, and none of it should consume the project.
 | [0015](adr/0015-release-channels-by-promotion.md) | Release channels by promotion, not branch merging | **Accepted** — revised 2026-11-10 |
 | [0016](adr/0016-update-application-policy.md) | Update application policy: two modes, no forced reboots | **Accepted** |
 | [0017](adr/0017-tests-live-in-tests.md) | Tests live in `tests/`, and everything has a test | **Accepted** |
+| [0018](adr/0018-cosmic-desktop-for-v1.md) | Ship COSMIC as the desktop environment for v1 | **Accepted** |
 
-Six ADRs define the product: the shell is the interface (0010), inference is
-local-first with an explicit cloud route (0011), distribution is public (0012),
-the platform is Fedora bootc (0013), and releases are promoted by digest (0015)
-with a user-chosen restart policy (0016). ADR-0014 records what the base change
+Five ADRs define the product: inference is local-first with an explicit cloud
+route (0011), distribution is public (0012), the platform is Fedora bootc (0013),
+and releases are promoted by digest (0015) with a user-chosen restart policy
+(0016). The interface is recorded separately: ADR-0018 makes COSMIC the desktop
+and the assistant a layer-shell surface above it, superseding ADR-0010's
+commitment to a compositor we write. ADR-0014 records what the base change
 dissolved. ADR-0017 is process rather than product: it fixes where tests live and
 makes "everything has a test" a failing assertion instead of an intention.
 
 ## Changelog of the documentation
+
+**2026-11-10, tenth revision.** COSMIC becomes the desktop.
+
+- **ADR-0018 accepted, superseding ADR-0010.** The session is COSMIC, installed
+  from Fedora 45 packages, and the assistant becomes a layer-shell overlay
+  summoned by a global shortcut rather than the session itself.
+- The trade-off is stated in the ADR rather than hidden: the assistant is now
+  ignorable, and the product's face is COSMIC's. What it buys is months off the
+  critical path, an inherited accessibility baseline, and a desktop that already
+  works while the loop is being built.
+- Verified before deciding: Fedora 45 ships COSMIC 1.10.0 including
+  `cosmic-session` and `cosmic-comp`; `cosmic-comp` carries layer-shell and
+  foreign-toplevel interfaces; `cosmic-greeter` needs `greetd`, which the image
+  does not have yet.
+- The compositor spike becomes a COSMIC integration spike; Phase 2 loses the
+  compositor and gains session integration.
+- ADR-0006 is revived: the layer-shell assistant surface it proposed is now the
+  mechanism the product depends on.
 
 **2026-11-10, ninth revision.** Tests moved to `tests/`, and the rule has teeth.
 
@@ -192,7 +216,8 @@ with cloud fallback (0011), and the base reopened (0009).
 | `RELEASE_TOKEN` with permission to push to `channels/**` | Any automated promotion | — |
 | Channel URL, and when to front GitHub with our own domain | Update resolution | — |
 | Deferral ceiling and escalation for security updates | ADR-0016 follow-up | — |
-| Compositor: build on `wlroots`, fork Sway/niri, or `Smithay` | Shell v0 | — |
+| Does a COSMIC layer-shell overlay hold focus and summon over fullscreen, at under 50 ms? | Assistant surface v0 | — |
+| COSMIC app set and first-run experience | Public beta | — |
 | Interaction model: how much does the shell take over | Phase 1 prototype | — |
 | Fedora release to track and rebuild cadence | Image pipeline | — |
 | MOK key strategy: build-time shared key vs per-device | First-run UX | — |

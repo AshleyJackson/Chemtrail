@@ -3,8 +3,9 @@
 > **Status note (2026-11-10).** The layering, trust boundaries and component map
 > below are current. The base is Fedora bootc (ADR-0013), so the platform layer
 > details (Alpine, OpenRC, dm-verity, Plasma) are superseded: see
-> [fedora-bootc.md](fedora-bootc.md). The session is a shell we own (ADR-0010),
-> not Plasma.
+> [fedora-bootc.md](fedora-bootc.md). The session is COSMIC (ADR-0018), with the
+> assistant as a layer-shell surface above it: not Plasma, and not a compositor
+> we write.
 
 ## What this is
 

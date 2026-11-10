@@ -33,7 +33,7 @@ budget before the shell exists.
 | M3 | Secure Boot with MOK enrolment | Public product, firmware default is Secure Boot on |
 | M4 | Installer usable by a non-technical person | No TUI installer reaches a consumer |
 | M5 | Atomic update with rollback | A bricked device is unrecoverable for a user who cannot debug it |
-| M6 | Extensible Wayland compositor stack | The shell is the product; we must own the session |
+| M6 | Extensible Wayland compositor stack | The shell is the product; now satisfied by a packaged COSMIC session (ADR-0018) |
 | M7 | Reproducible custom image build | Otherwise every release is hand-assembled |
 | M8 | A supportable update channel | We must ship fixes to strangers |
 

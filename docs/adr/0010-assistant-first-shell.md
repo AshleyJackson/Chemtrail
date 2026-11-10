@@ -1,10 +1,10 @@
 # ADR-0010: The assistant-first shell is the product interface
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0018
 - **Date:** 2026-11-10
 - **Deciders:** project owner
 - **Supersedes:** ADR-0005
-- **Superseded by:** —
+- **Superseded by:** ADR-0018
 
 ## Context
 

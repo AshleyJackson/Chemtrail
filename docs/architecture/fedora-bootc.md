@@ -35,15 +35,16 @@ Base: `quay.io/fedora/fedora-bootc:<release>`, pinned by digest.
 |-------|----------|-------|
 | 1. Base | `fedora-bootc`, kernel, systemd, NetworkManager, SELinux policy | Pinned |
 | 2. Graphics | Mesa, NVIDIA driver + module, Vulkan loader | Module built in this layer |
-| 3. Session runtime | Wayland libs, PipeWire, portals, fonts, xdg-desktop-portal | Deliberately no DE |
-| 4. Shell | our compositor, assistant surface, session units | ADR-0010 |
+| 3. Session runtime | Wayland libs, PipeWire, portals, fonts, xdg-desktop-portal | Shared by COSMIC and apps |
+| 4. Desktop | COSMIC (`cosmic-session`, `cosmic-comp`, greeter) and the assistant as a layer-shell client | ADR-0018 |
 | 5. Control plane | `agentd`, `aios` CLI, model store tooling | ADR-0007, ADR-0011 |
 | 6. Health | `greenboot` checks, first-boot provisioning | ADR-0013 |
 
 Rules:
 
-- **No desktop environment.** Installing Plasma or GNOME would pull hundreds of
-  packages we do not use and reintroduce someone else's UX as the default session.
+- **One desktop, deliberately.** COSMIC is the session (ADR-0018). Plasma and
+  GNOME are not installed: a second desktop would double the session surface and
+  reopen a UX question this project has already answered.
 - **No compilers or `kernel-devel` in the final image.** If the module is built at
   build time, the toolchain does not ship. This keeps the image small and removes
   an attack surface.

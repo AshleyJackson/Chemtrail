@@ -1,16 +1,17 @@
 # ADR-0006: Assistant as a standalone layer-shell surface
 
-- **Status:** Proposed — narrowed by ADR-0010
+- **Status:** Proposed — revived by ADR-0018
 - **Date:** 2026-11-10
 - **Deciders:** project owner
 - **Supersedes:** —
 - **Superseded by:** —
 
-> **Narrowed.** ADR-0010 makes the compositor and shell our own, so this ADR's
-> "capability provider" design is no longer the mechanism for window operations —
-> the shell performs them directly. The parts that survive are the principles: the
-> assistant is a client of the session, not a component of it, and no compositor
-> internals leak into the assistant logic.
+> **Revived by ADR-0018.** ADR-0010 had narrowed this design on the grounds that a
+> shell we owned would perform window operations directly. ADR-0018 supersedes
+> that and makes COSMIC the session, so the mechanism here is once again the one
+> the product depends on. The principles it states are unchanged: the assistant is
+> a client of the session, not a component of it, and no compositor internals leak
+> into the assistant logic.
 
 ## Context
 
