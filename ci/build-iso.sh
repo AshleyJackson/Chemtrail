@@ -108,8 +108,12 @@ echo "--- building the ISO from $reference"
 
 echo "--- collecting the output"
 mkdir -p "$OUT"
-"$RUNTIME" run --rm --volume "$volume:/output" "$BASE" \
-  tar -C /output -cf - . | tar -C "$OUT" -xf -
+# Copy out through the engine API instead of piping a tar stream. A multi-gigabyte
+# stream written from inside a container to a shared working tree stalls on hosts
+# that mount that tree over a slow filesystem, which Docker Desktop does.
+ctr="$("$RUNTIME" create --volume "$volume:/output" "$BASE")"
+"$RUNTIME" cp "$ctr:/output/." "$OUT"
+"$RUNTIME" rm -f "$ctr" >/dev/null
 "$RUNTIME" volume rm "$volume" >/dev/null
 
 iso="$(find "$OUT" -type f -name '*.iso' -print -quit)"

@@ -4,9 +4,9 @@ An assistant-first operating system: the user states intent, the system acts, an
 applications are windows rather than the primary interface.
 
 **Status:** scaffold implemented. Base platform settled as **Fedora bootc**; the
-release pipeline exists as code and runs end to end on dummy digests. The desktop
-is COSMIC (ADR-0018); the assistant surface and a published image do not exist
-yet.
+release pipeline exists as code and runs end to end on dummy digests. An installer
+ISO can be built from the image and installed in a VM; the desktop is COSMIC
+(ADR-0018) but is not in the image yet, and there is no published image.
 
 ## What this project is
 
@@ -83,6 +83,23 @@ ADR-0019 is a rejection rather than a commitment: XLibre is out of the image, an
 Fedora's Xwayland stays the only X server.
 
 ## Changelog of the documentation
+
+**2026-11-10, twelfth revision.** The image became installable.
+
+- **`ci/build-iso.sh` builds an installer ISO** from the platform image with
+  `bootc-image-builder`, using a throwaway registry rather than podman's storage,
+  so it runs under Docker and Docker Desktop as well as podman.
+- **The image now copies its repository definitions into `/etc/yum.repos.d`.**
+  Fedora 45 moved them to `/usr/share/dnf5/repos.d`, and osbuild reads only the
+  old location, so the ISO build failed with `NoReposError` until the files were
+  where the builder looks. dnf5 reads both, so nothing else changes.
+- **An ISO was built and installed in VirtualBox** (EFI firmware, interactive
+  Anaconda), and the installer wrote the container payload to disk. The first boot
+  of the installed system is the next check, not a claim this revision makes;
+  [run/virtualbox.md](run/virtualbox.md) records the recipe and the three failures
+  that shaped it.
+- The image is still the platform only. COSMIC is not in it, so this proves the
+  install and boot path, not the product.
 
 **2026-11-10, eleventh revision.** XLibre rejected.
 

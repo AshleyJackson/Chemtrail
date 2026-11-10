@@ -11,9 +11,31 @@ greenboot) and no desktop environment.
 bash ci/build-iso.sh
 ```
 
-It prints the ISO path under `build/iso/` and its SHA-256. Expect that path to be
+It prints the ISO path and its SHA-256. The path is
 `build/iso/bootiso/install.iso`; the script finds the file rather than assuming,
 so trust what it prints.
+
+On a Windows host there is no `bash`, so the script runs in a container against
+the host engine (Docker Desktop), which is what it was written for:
+
+```powershell
+docker run --rm -v "${PWD}:/w" -w /w `
+  -v /var/run/docker.sock:/var/run/docker.sock `
+  -e HOME=/tmp/client -e DOCKER_CONFIG=/tmp/client/.docker `
+  quay.io/fedora/fedora-bootc:45 bash -c `
+  'mkdir -p /tmp/client && dnf -y -q install docker-cli >/dev/null && RUNTIME=docker bash ci/build-iso.sh'
+```
+
+Three things it does that are not obvious, each learned by failing first:
+
+- **The builder cannot read the engine's storage.** It needs a containers/storage
+  holding the image, so the script pushes to a throwaway registry and copies the
+  image in with `skopeo`. Nothing touches `/var/lib/docker`.
+- **It needs the host cgroup namespace.** Without `--cgroupns=host`, nested podman
+  inside the builder dies on the `pids` controller.
+- **Fedora 45 keeps its repositories in `/usr/share/dnf5/repos.d`**, which osbuild
+  does not read. The Containerfile copies them into `/etc/yum.repos.d`; without
+  that the build stops at `NoReposError`.
 
 ## 2. Create the VM
 
@@ -54,8 +76,15 @@ the second deployment that rollback needs.
 & $vbox startvm $vm
 ```
 
-Anaconda comes up in the VirtualBox window. Create a user, accept the defaults
-for storage (the installer wipes the 40 GB disk), begin the installation.
+Anaconda comes up in the VirtualBox window. Create a user first: the installer
+will not ask again later, and a system with no account cannot be logged into once
+it boots. Then accept the defaults for storage (the installer wipes the 40 GB
+disk) and begin the installation.
+
+Expect the payload step to be slow. The installer writes the whole container image
+from the ISO to the disk, several gigabytes of it, and in VirtualBox that runs at
+a few megabytes per second; it can take tens of minutes. The progress bar is
+honest about it.
 
 Notes:
 
