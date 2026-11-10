@@ -211,7 +211,7 @@ commit -> CI build (Containerfile) -> sign image -> push to staging registry
 ## 10. What we deliberately do not do
 
 - Fork Anaconda, systemd, or ostree.
-- Ship a desktop environment.
+- Fork or patch COSMIC to fit: customisation is configuration (ADR-0018 §4).
 - Support BIOS/legacy boot.
 - Support `aarch64` in v1.
 - Allow runtime package installation outside a documented developer mode.

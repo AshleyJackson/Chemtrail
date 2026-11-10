@@ -2,9 +2,10 @@
 
 # AI_OS platform image (Phase 0).
 #
-# Deliberately thin: base, GPU, session libraries, health. No desktop
-# environment and no shell yet — see docs/architecture/fedora-bootc.md §2 and
-# ADR-0010.
+# Deliberately thin: base, GPU, session libraries, health. The desktop is COSMIC
+# with the assistant as a layer-shell surface above it (ADR-0018); that stage does
+# not exist yet, so this file still builds the platform and nothing above it. See
+# docs/architecture/fedora-bootc.md §2.
 #
 # The base is pinned by digest (the multi-arch index digest). `dnf upgrade`
 # still floats within Fedora 45; pinning that snapshot to a date is a Phase 0
@@ -41,8 +42,8 @@ RUN STRIP=1 bash /usr/local/libexec/aios/build-nvidia-kmod.sh \
 
 # Layer 3 — session runtime.
 #
-# Libraries only. The compositor (Phase 2) owns the rest. Installing a desktop
-# environment here would reintroduce someone else's UX as the product's face.
+# Libraries only. COSMIC owns the rest (ADR-0018), and it arrives as one stage of
+# its own so the desktop can be replaced atomically like everything else.
 RUN dnf install -y --setopt=install_weak_deps=False \
       libwayland-server libwayland-client libwayland-egl libwayland-cursor \
       mesa-libEGL mesa-libgbm mesa-dri-drivers mesa-vulkan-drivers vulkan-loader \
