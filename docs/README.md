@@ -49,8 +49,8 @@ differentiated, and none of it should consume the project.
 
 ## Running it
 
-- [Installing the image in VirtualBox](run/virtualbox.md) — build an installer
-  ISO, install it in a VM, and check that the installed system boots and reports
+- [Installing the image in VirtualBox](run/virtualbox.md) — build the network-install
+  medium, install it in a VM, and check that the installed system boots and reports
   its own build identity.
 
 ## Decision log

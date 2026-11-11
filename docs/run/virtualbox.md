@@ -9,7 +9,9 @@ Two paths are documented here. Sections 1–6 record how the image was first
 installed from an ISO we build; that path is history now, kept because it
 recorded three failures that shaped the builder. **The install path going forward
 is the network install in section 7** (ADR-0020): Fedora's own netinst media plus
-a kickstart that pulls the image from GHCR. No ISO of ours is built or published.
+a kickstart that pulls the image from GHCR. No ISO carrying the payload is built
+or published. §7.0 builds the whole thing into one bootable file; §7.1–§7.3 do the
+same by hand, which is what to reach for when something goes wrong.
 
 ## 1. Build the ISO
 
@@ -151,6 +153,40 @@ pins, by digest, the first image CI published (commit 9219567). Note that every
 new commit builds a new image, so this file lags HEAD until it is re-rendered —
 that rendering is what promotion does per channel (ADR-0020 follow-up), not
 something to do by hand for each test.
+
+### 7.0 Build the one-file medium
+
+There is a shortcut that removes every manual step below: bake the kickstart into
+Fedora's installer image and boot the result.
+
+```bash
+bash ci/build-netboot-iso.sh
+```
+
+It prints the ISO path, its size, and its SHA-256. The output is
+`build/netboot/aios-netboot-x86_64.iso`, and it is Fedora's netinstall media plus
+one file, so it stays within a few megabytes of Fedora's own download.
+
+What it does, and why each part is there:
+
+- **Fetches Fedora's netinst ISO and verifies it** against the published
+  `Fedora-Server-45-1.4-x86_64-CHECKSUM`. The base installer is Fedora's, so it is
+  checked rather than trusted.
+- **Embeds `install/aios-netinst.ks`** with `mkksiso`, which also rewrites the boot
+  entries to `inst.ks=hd:LABEL=<iso's volume id>:/aios-netinst.ks`. The kernel
+  arguments are inside the EFI boot image, which is why this needs `losetup` and
+  `mkefiboot`: an unprivileged container cannot rebuild it, so run the script with
+  `--privileged` when running it in a container.
+- **Proves the result** is an ISO9660 image (`CD001` at offset 32769) with the
+  kickstart actually inside it, rather than trusting the tool's exit status.
+
+The kickstart pins a digest, so this medium installs exactly one image. Rebuild it
+after a new image is published, or point it at a different digest by editing the
+`bootc --source-imgref` line first.
+
+Boot it in the VM from section 2 — port 0 holds this ISO instead of ours — and the
+install runs unattended: the kickstart supplies storage, locale, and the
+deployment. There is nothing to answer.
 
 ### 7.1 Get the media
 
