@@ -151,11 +151,14 @@ wireless.
   whether the image installs and the account survives to the greeter. It does — the
   greeter lists it by its full name, and its password logs into a COSMIC session.
 - **Two defects the install exposed, both still open.** `systemd-remount-fs.service`
-  fails: Anaconda writes `/etc/fstab` with `ro` for `/` and `/boot` while the kernel
-  boots `rw`, and the remount is rejected with `overlay: No changes allowed in
-  reconfigure`. And `/etc/locale.conf` lands as `LANG="C.UTF-8"` although the
-  kickstart asked for `en_US.UTF-8`, which cosmic-greeter rejects as an invalid
-  language. Neither blocks the desktop; both need an answer before real hardware.
+  fails because `/` is a composefs overlay mounted `ro` while Anaconda wrote a
+  conventional `/etc/fstab` line for it (`btrfs subvol=root … ro`); applying that
+  line to an overlay is refused with `overlay: No changes allowed in reconfigure`.
+  And `/etc/locale.conf` lands as `LANG="C.UTF-8"` although the kickstart asked for
+  `en_US.UTF-8`, because the image ships only `C.utf8` in `/usr/lib/locale` — there
+  is no `glibc-langpack-en` — so cosmic-greeter rejects the locale as an invalid
+  language. Neither blocks the desktop; the second is a one-package fix, the first
+  needs the fstab the installer writes to agree with composefs.
 - **Also found: the evidence upload never worked.** `.evidence` is hidden and
   `upload-artifact` skips hidden files, so build produced an empty artifact, `check`
   failed to download a digest, and the failure read as a check problem. All three
