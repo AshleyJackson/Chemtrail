@@ -1,18 +1,9 @@
 #!/usr/bin/env bash
-# Turn the platform image into an installer ISO, for a VirtualBox smoke test.
+# Offline installer ISO from the image, for a VM smoke test.
 #
-# An OCI image is not bootable media, so something has to convert it.
-# bootc-image-builder does that, but it pulls the image by reference: it cannot
-# read another engine's local storage. The podman recipe shares
-# /var/lib/containers/storage with the builder, which is podman-only. This uses
-# the portable route instead: a throwaway registry on a private network, so the
-# same script runs under podman or Docker, on Linux or under Docker Desktop.
-#
-# The ISO is interactive Anaconda on purpose. No kickstart, no answers baked in:
-# the first question this image should answer is whether a human can install it,
-# not whether a machine can.
-#
-# Output: build/iso/, holding the ISO and the builder's manifests.
+# bootc-image-builder pulls by reference and cannot read another engine's storage,
+# so the image goes through a throwaway registry on a private network.
+# Output: build/iso/ (3.4 GB; see ci/build-netboot-iso.sh for the small medium).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -35,9 +26,8 @@ cleanup() {
   "$RUNTIME" rm -f "$registry" >/dev/null 2>&1 || true
   "$RUNTIME" network rm "$network" >/dev/null 2>&1 || true
   "$RUNTIME" volume rm -f "$conf" >/dev/null 2>&1 || true
-  # $storage survives on purpose: it holds the copied image, and re-copying a
-  # gigabyte on every attempt makes a failing build painful to iterate on.
-  # Remove it with: podman volume rm $storage
+  # $storage is kept: it holds the copied image, and recopying a gigabyte per
+  # attempt makes iteration painful. Remove with: podman volume rm $storage
 }
 trap cleanup EXIT
 
@@ -70,19 +60,15 @@ done
 echo "--- building the ISO from $reference"
 "$RUNTIME" volume create "$volume" >/dev/null
 
-# The builder pulls the image over the network, and this registry speaks plain
-# HTTP, so it has to be declared insecure. Current builder releases have no
-# --tls-verify flag. The config travels in a volume and is pointed at by
-# environment variable: mounting it over /etc/containers would hide the image
-# signature policy the builder also needs.
+# The registry speaks plain HTTP and the builder has no --tls-verify flag, so it is
+# declared insecure via CONTAINERS_REGISTRIES_CONF; mounting over /etc/containers
+# would hide the image signature policy.
 "$RUNTIME" volume create "$conf" >/dev/null
 "$RUNTIME" run --rm --volume "$conf:/conf" "$BASE" \
   bash -c "printf '[[registry]]\nlocation = \"$registry:$PORT\"\ninsecure = true\n' > /conf/registries.conf"
 
-# The builder also wants a containers/storage to work in, and says so plainly
-# when it cannot find one. It is not the engine's storage: the image has to be
-# present there under the same reference the builder is given, so it is copied in
-# with skopeo rather than inherited from the engine.
+# The builder needs the image in its own containers/storage, under the reference it
+# is given.
 "$RUNTIME" volume create "$storage" >/dev/null
 "$RUNTIME" run --rm --privileged --network "$network" \
   --env CONTAINERS_REGISTRIES_CONF=/conf/registries.conf \
@@ -108,9 +94,8 @@ echo "--- building the ISO from $reference"
 
 echo "--- collecting the output"
 mkdir -p "$OUT"
-# Copy out through the engine API instead of piping a tar stream. A multi-gigabyte
-# stream written from inside a container to a shared working tree stalls on hosts
-# that mount that tree over a slow filesystem, which Docker Desktop does.
+# Copy out through the engine API: a multi-gigabyte tar stream into a bind mount
+# stalls on Docker Desktop.
 ctr="$("$RUNTIME" create --volume "$volume:/output" "$BASE")"
 "$RUNTIME" cp "$ctr:/output/." "$OUT"
 "$RUNTIME" rm -f "$ctr" >/dev/null
@@ -123,7 +108,6 @@ if [ -z "$iso" ]; then
   exit 1
 fi
 
-# An ISO is not an ISO because it ends in .iso: check the volume descriptor.
 if [ "$(dd if="$iso" bs=1 skip=32769 count=5 2>/dev/null || true)" != "CD001" ]; then
   echo "$iso is not an ISO9660 image" >&2
   exit 1
@@ -132,5 +116,3 @@ fi
 echo "iso:    $iso"
 echo "size:   $(du -h "$iso" | cut -f1)"
 echo "sha256: $(sha256sum "$iso" | cut -d' ' -f1)"
-echo
-echo "Next: docs/run/virtualbox.md creates the VM with EFI firmware and this ISO."
