@@ -62,7 +62,8 @@ RUN chmod 0755 /etc/greenboot/check/required.d/*.sh /etc/greenboot/check/wanted.
 # and is refused, failing the unit on first boot. Reconcile it before that runs.
 COPY image/systemd/aios-firstboot-fstab.service /etc/systemd/system/
 COPY image/scripts/aios-firstboot-fstab.sh /usr/local/libexec/aios/
-RUN chmod 0755 /usr/local/libexec/aios/aios-firstboot-fstab.sh \
+RUN chmod 0644 /etc/systemd/system/aios-firstboot-fstab.service \
+  && chmod 0755 /usr/local/libexec/aios/aios-firstboot-fstab.sh \
   && systemctl enable aios-firstboot-fstab.service
 
 RUN mkdir -p /usr/lib/aios \
