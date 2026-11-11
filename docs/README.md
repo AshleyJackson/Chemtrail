@@ -100,6 +100,45 @@ wireless.
 
 ## Changelog of the documentation
 
+**2026-11-11, seventeenth revision.** The two first-boot defects are fixed in the image and measured away on a fresh install.
+
+- **Both fixes live in the image, not the kickstart.** The install is interactive
+  (ADR-0021), so the installer writes its own `/etc/fstab` and the account; the image
+  must still come up clean on first boot. That is an image concern, and both fixes are
+  in the `Containerfile` and under `image/`, with a test for each in
+  `tests/layout/test_firstboot_defects.py` (the suite is 168 tests, all passing).
+- **The locale defect is closed.** The image now installs `glibc-langpack-en`, so
+  `en_US.UTF-8` actually exists instead of the deployment carrying only `C.utf8`. On
+  the fresh install `LANG` is `en_US.UTF-8` (it was `C.UTF-8`), `en_US.utf8` is in
+  `/usr/lib/locale`, and `cosmic-greeter` — which had been rejecting the language —
+  is active.
+- **The fstab defect is closed.** Anaconda's conventional `/` fstab line is applied by
+  `systemd-remount-fs` to the composefs overlay and refused with
+  `overlay: No changes allowed in reconfigure`, failing the unit on first boot. On a
+  bootc/ostree system the root is mounted by the kernel command line, not fstab, so
+  the `/` line is duplicative. A first-boot reconciler
+  (`image/systemd/aios-firstboot-fstab.service`, ordered `Before=systemd-remount-fs.service`)
+  drops the line whose mountpoint is `/` and leaves `/boot`, `/boot/efi` and `/var` as
+  the installer wrote them. It is idempotent: a no-op on every later boot and on any
+  fstab that already has no `/` line. This is the known workaround (ostreedev/ostree#3193)
+  and the direction cgwalters sets — "don't have `/` in `/etc/fstab` at all".
+- **Measured on a fresh install of the exact CI image.** The build for `de4efd1`
+  published `sha256:74c6ed2a…`; the never-published test kickstart (carrying a DHCP
+  profile so the headless VM is reachable) installed it to a 40 GiB disk, pulled the
+  2.3 GB image, and rebooted into `Fedora Linux 45 (Forty Five) (ostree:0)`.
+  `bootc status` names the pinned digest, `/usr/lib/aios/build-id` reads
+  `2026.11.11+gde4efd1.r13`, and Greenboot is GREEN. `systemd-remount-fs.service` is
+  `active` on first boot (it had been failing), the reconciler is `enabled` and ran
+  `Result=success` ahead of it, and `LANG` is `en_US.UTF-8`. Driven directly, the
+  reconciler drops a `/` line and keeps `/var`, and does so again on a second run.
+  Both defects open in the sixteenth revision are now closed.
+- **A headless bootc install needs the disk authorized.** A bare `autopart` leaves the
+  graphical installer at "Kickstart insufficient" with Begin Installation greyed (the
+  intended ADR-0021 interactive state); the test kickstart adds `zerombr` and
+  `clearpart --all --initlabel` before `autopart` so the headless VM proceeds
+  unattended. The published kickstart still supplies no storage, the account, or the
+  network.
+
 **2026-11-11, sixteenth revision.** The installer asks; it no longer answers.
 
 - **ADR-0021 accepted: the install is interactive and graphical.** The kickstart

@@ -7,4 +7,4 @@ keyboard us
 timezone UTC --utc
 graphical
 xconfig --startxonboot
-bootc --source-imgref=registry:ghcr.io/ashleyjackson/chemtrail@sha256:8f1fa6ab22bf63f55d5a5f985daabff825224392f606740a8b690fc9c3d0d6df --target-imgref=ghcr.io/ashleyjackson/chemtrail@sha256:8f1fa6ab22bf63f55d5a5f985daabff825224392f606740a8b690fc9c3d0d6df
+bootc --source-imgref=registry:ghcr.io/ashleyjackson/chemtrail@sha256:74c6ed2a0a1b38775527457b5265e44c45250e0faac18c6563ab1253b773482c --target-imgref=ghcr.io/ashleyjackson/chemtrail@sha256:74c6ed2a0a1b38775527457b5265e44c45250e0faac18c6563ab1253b773482c
