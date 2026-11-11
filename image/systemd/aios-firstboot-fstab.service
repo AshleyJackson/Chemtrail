@@ -1,0 +1,20 @@
+# The installer writes a conventional /etc/fstab (a line for / based on its
+# autopart) that this composefs/ostree system does not use: the root is mounted
+# by the kernel command line, not fstab. systemd-remount-fs applies that / line
+# to the overlay and is refused, failing the unit on the first boot.
+#
+# Drop the / line before systemd-remount-fs runs. This is a no-op on every boot
+# after the first (the line is gone) and on any system whose fstab already
+# carries no / entry.
+[Unit]
+Description=AI_OS first boot: drop the installer's / fstab line that fights the composefs root
+Before=systemd-remount-fs.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/aios/aios-firstboot-fstab.sh
+
+[Install]
+WantedBy=sysinit.target

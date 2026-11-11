@@ -33,6 +33,12 @@ RUN dnf install -y --setopt=install_weak_deps=False \
       @cosmic-desktop cosmic-greeter cosmic-greeter-daemon \
  && dnf clean all
 
+# The installer asks for en_US.UTF-8, but that only sticks if the locale data is
+# actually in the image: without it the deployment carries just C.utf8, the
+# system falls back to C.UTF-8, and cosmic-greeter rejects the language.
+RUN dnf install -y --setopt=install_weak_deps=False glibc-langpack-en \
+  && dnf clean all
+
 # cosmic-greeter.service is the display manager and is enabled by preset; its
 # D-Bus daemon is not, and the greeter cannot log anyone in without it.
 RUN systemctl enable cosmic-greeter-daemon.service \
@@ -49,6 +55,15 @@ RUN systemctl mask bootc-fetch-apply-updates.timer
 
 COPY image/greenboot/check/ /etc/greenboot/check/
 RUN chmod 0755 /etc/greenboot/check/required.d/*.sh /etc/greenboot/check/wanted.d/*.sh
+
+# The installer writes a conventional /etc/fstab (a / line for its own autopart)
+# that a composefs/ostree root does not use: the root is mounted by the kernel
+# command line, not fstab. systemd-remount-fs applies that / line to the overlay
+# and is refused, failing the unit on first boot. Reconcile it before that runs.
+COPY image/systemd/aios-firstboot-fstab.service /etc/systemd/system/
+COPY image/scripts/aios-firstboot-fstab.sh /usr/local/libexec/aios/
+RUN chmod 0755 /usr/local/libexec/aios/aios-firstboot-fstab.sh \
+  && systemctl enable aios-firstboot-fstab.service
 
 RUN mkdir -p /usr/lib/aios \
  && printf '%s\n' "${BUILD_ID}" > /usr/lib/aios/build-id
