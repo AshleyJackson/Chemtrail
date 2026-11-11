@@ -1,9 +1,7 @@
 # Installing the image in VirtualBox
 
 This is the first end-to-end check of the image as a *machine*: Anaconda starts,
-a human installs it, and the installed system boots. It is not a desktop test —
-the image built today carries the platform (NVIDIA module, session libraries,
-greenboot) and no desktop environment.
+a human installs it, and the installed system boots to the COSMIC greeter.
 
 Two paths are documented here. Sections 1–6 record how the image was first
 installed from an ISO we build; that path is history now, kept because it
@@ -146,13 +144,18 @@ Get-Content "$disks\serial.log" -Tail 80
 
 ## 7. Network install (ADR-0020)
 
-The install medium is Fedora's netinst ISO — we build nothing and host only a
-few-KB kickstart that tells Anaconda to pull the image from GHCR with its `bootc`
-command. The kickstart lives in this repository as `install/aios-netinst.ks` and
-pins, by digest, the first image CI published (commit 9219567). Note that every
-new commit builds a new image, so this file lags HEAD until it is re-rendered —
-that rendering is what promotion does per channel (ADR-0020 follow-up), not
-something to do by hand for each test.
+The medium carries no payload — we build nothing and host only a few-KB kickstart
+that tells Anaconda to pull the image from GHCR with its `bootc` command. The
+kickstart lives in this repository as `install/aios-netinst.ks` and pins, by
+digest, the first image CI published (commit 9219567). Note that every new commit
+builds a new image, so this file lags HEAD until it is re-rendered — that rendering
+is what promotion does per channel (ADR-0020 follow-up), not something to do by
+hand for each test.
+
+The installer is interactive by design (ADR-0021). The kickstart answers only what
+the medium can know — payload, locale, keyboard, timezone, graphical target — and
+leaves the rest to the person installing: the disk to use, the account and its
+password, and the network, Wi-Fi included. There is no unattended mode.
 
 ### 7.0 Build the one-file medium
 
@@ -182,11 +185,28 @@ What it does, and why each part is there:
 
 The kickstart pins a digest, so this medium installs exactly one image. Rebuild it
 after a new image is published, or point it at a different digest by editing the
-`bootc --source-imgref` line first.
+`bootc --source-imgref` line first. The script also adds `inst.graphical` to every
+boot entry and fails if the finished image does not carry it: the text installer
+cannot configure a wireless network, so the graphical one is not optional.
 
 Boot it in the VM from section 2 — port 0 holds this ISO instead of ours — and the
-install runs unattended: the kickstart supplies storage, locale, and the
-deployment. There is nothing to answer.
+installer comes up in its graphical UI asking for three things:
+
+| Question | What it is for |
+|---|---|
+| Installation Destination | the disk to install onto; the default erases it |
+| User Creation | the account and its password. This kickstart disables root, so an install with no user has no way in |
+| Network & Host Name | wired or Wi-Fi, plus the hostname |
+
+Answer all three and **Begin Installation** becomes available; until then it stays
+greyed out. Locale, keyboard and timezone come pre-filled and can be changed.
+
+The network step is the one to get right on a laptop. A Wi-Fi network joined here
+is saved into the installed system, in `/etc/NetworkManager/system-connections`,
+so the machine reconnects at first boot without anyone logging in. Since Fedora 44
+Anaconda creates no profile for a device it was not asked about, so a machine left
+offline in the installer comes up offline — and the install itself cannot finish
+either, because the payload is pulled from the registry.
 
 ### 7.1 Get the media
 
@@ -233,9 +253,9 @@ of the `linux` line:
  inst.ks=https://raw.githubusercontent.com/AshleyJackson/Chemtrail/master/install/aios-netinst.ks
 ```
 
-and boot with Ctrl+X. Anaconda fetches the kickstart and pre-fills everything it
-contains — storage (it wipes the disk), locale, and the `bootc` deployment — so
-the install is confirm-and-begin rather than a form to fill in. To serve the file
+and boot with Ctrl+X. Anaconda fetches the kickstart, pre-fills the payload and the
+locale defaults, and then asks the same three questions as §7.0 — the disk, the
+account, the network. Nothing on the boot command line skips them. To serve the file
 locally instead of from GitHub:
 
 ```powershell

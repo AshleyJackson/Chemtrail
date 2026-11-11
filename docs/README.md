@@ -9,10 +9,11 @@ path is a network install ([ADR-0020](adr/0020-thin-install-media.md), accepted)
 Fedora's own netinst media plus a hosted kickstart that pulls the image from
 GitHub Container Registry — no installer ISO is built or published, because the
 first one came out at 3.42 GB against GitHub's 2 GiB per-asset limit. The desktop
-is COSMIC (ADR-0018) but is not in the image yet. The build workflow publishes an
-image to GHCR on every commit to `master`; it has now published, and the hosted
-kickstart pins that first image by digest. What it took to get there — three
-workflow bugs and a re-pinned base — is recorded in the changelog below.
+is COSMIC (ADR-0018) and is in the image: an install boots to its greeter. The
+build workflow publishes an image to GHCR on every commit to `master`; it has now
+published, and the hosted kickstart pins that first image by digest. The install
+itself is interactive (ADR-0021). What it took to get there — three workflow bugs
+and a re-pinned base — is recorded in the changelog below.
 
 ## What this project is
 
@@ -77,6 +78,7 @@ differentiated, and none of it should consume the project.
 | [0018](adr/0018-cosmic-desktop-for-v1.md) | Ship COSMIC as the desktop environment for v1 | **Accepted** |
 | [0019](adr/0019-no-xlibre.md) | Do not ship XLibre, in any role | Rejected |
 | [0020](adr/0020-thin-install-media.md) | Thin install media, capabilities provisioned after first boot | **Accepted** — 2026-11-11 |
+| [0021](adr/0021-install-is-interactive-and-graphical.md) | The install is interactive and graphical | **Accepted** |
 
 Five ADRs define the product: inference is local-first with an explicit cloud
 route (0011), distribution is public (0012), the platform is Fedora bootc (0013),
@@ -90,9 +92,45 @@ ADR-0019 is a rejection rather than a commitment: XLibre is out of the image, an
 Fedora's Xwayland stays the only X server. ADR-0020 decides how the system reaches
 a machine rather than what it contains: nightlies publish an image and not an
 installer, the install medium carries no payload (Fedora's netinst plus a hosted
-kickstart), and the NVIDIA layer arrives after first boot.
+kickstart), and the NVIDIA layer arrives after first boot. ADR-0021 decides what
+that medium asks rather than what it carries: the person installing supplies the
+account, the password and the network, including Wi-Fi, in the graphical installer,
+because no kickstart command can prompt and the text interface cannot configure
+wireless.
 
 ## Changelog of the documentation
+
+**2026-11-11, sixteenth revision.** The installer asks; it no longer answers.
+
+- **ADR-0021 accepted: the install is interactive and graphical.** The kickstart
+  had been supplying storage, root's password and the locale, so the install ran
+  unattended. On the hardware this is for, that is wrong twice over: the machine
+  ends up with a root password chosen by whoever wrote the kickstart and no
+  account for its owner, and a laptop whose only network is Wi-Fi gets nothing,
+  because no kickstart command can prompt and Fedora's text installer cannot
+  configure wireless at all.
+- **`install/aios-netinst.ks` carries no `clearpart`, `autopart`, `rootpw` or
+  `user`**, and declares `graphical`. Verified by rebuilding the medium and booting
+  it: Installation Summary opens with Installation Destination "Kickstart
+  insufficient", Root Account disabled, User Creation "no user will be created",
+  Network & Host Name connected, and Begin Installation greyed out until they are
+  answered.
+- **`ci/build-netboot-iso.sh` forces `inst.graphical` on every boot entry** and
+  fails if the finished image does not carry it. The check was wrong first: it
+  passed a directory to `xorriso -extract`, which wants a full destination path,
+  so it had been grepping nothing and failing the build instead of the medium.
+- **Wi-Fi in the installer is measured, not assumed.** Fedora 45's
+  `images/install.img` carries `usr/bin/wpa_supplicant`, the
+  `fi.w1.wpa_supplicant1` D-Bus service, `libnm-device-plugin-wifi.so`, 199
+  `iwlwifi` firmware files and Anaconda's network `device_configuration` module.
+  Since Fedora 44 only devices configured during installation get a persistent
+  profile in `/etc/NetworkManager/system-connections`, so the network joined in
+  the installer is the network the installed system comes up on.
+- **Five tests hold it**: `tests/layout/test_install_medium.py` fails if the
+  kickstart answers the disk or the account, drops `graphical`, stops starting the
+  graphical target, loses its digest pin, or if the builder stops forcing the GUI.
+- Medium rebuilt: `build/netboot/aios-netboot-x86_64.iso`, 1213 MiB, sha256
+  `aadf94ad977b1d74339a126836b46f7be2c6da63eaf71d211c6fae1a2c1f9575`.
 
 **2026-11-11, fifteenth revision.** The first image was published to GHCR, and the kickstart now points at it.
 

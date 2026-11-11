@@ -48,7 +48,9 @@ fi
 
 echo "--- embedding $KICKSTART with mkksiso"
 rm -f "$OUT/$RESULT_NAME"
-mkksiso --ks "$KICKSTART" "$BASE_ISO" "$OUT/$RESULT_NAME"
+# The installer must stay graphical: the storage, account and Wi-Fi questions are
+# answered there, and the text interface cannot configure a wireless network.
+mkksiso --ks "$KICKSTART" --cmdline inst.graphical "$BASE_ISO" "$OUT/$RESULT_NAME"
 
 iso="$OUT/$RESULT_NAME"
 [ -f "$iso" ] || { echo "no ISO produced at $iso" >&2; exit 1; }
@@ -62,6 +64,14 @@ fi
 ks_name="$(basename "$KICKSTART")"
 if ! xorriso -indev "$iso" -find / -name "$ks_name" 2>/dev/null | grep -q "$ks_name"; then
   echo "the kickstart is not inside $iso" >&2
+  exit 1
+fi
+
+grub_dir="$(mktemp -d)"
+trap 'rm -rf "$grub_dir"' EXIT
+xorriso -osirrox on -indev "$iso" -extract /EFI/BOOT/grub.cfg "$grub_dir/grub.cfg" >/dev/null 2>&1 || true
+if ! grep -q inst.graphical "$grub_dir/grub.cfg" 2>/dev/null; then
+  echo "the boot entries in $iso do not force the graphical installer" >&2
   exit 1
 fi
 
