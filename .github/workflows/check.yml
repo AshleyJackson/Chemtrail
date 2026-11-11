@@ -54,4 +54,6 @@ jobs:
         with:
           name: evidence-image
           path: .evidence/image-*.json
+          include-hidden-files: true
+          if-no-files-found: error
           retention-days: 90
