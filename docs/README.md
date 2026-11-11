@@ -129,8 +129,42 @@ wireless.
 - **Five tests hold it**: `tests/layout/test_install_medium.py` fails if the
   kickstart answers the disk or the account, drops `graphical`, stops starting the
   graphical target, loses its digest pin, or if the builder stops forcing the GUI.
-- Medium rebuilt: `build/netboot/aios-netboot-x86_64.iso`, 1213 MiB, sha256
-  `aadf94ad977b1d74339a126836b46f7be2c6da63eaf71d211c6fae1a2c1f9575`.
+- Medium rebuilt: `build/netboot/aios-netboot-x86_64.iso`, 1213 MiB. The version
+  that carries the GUI-only kickstart against the headless digest is
+  `aadf94ad977b1d74339a126836b46f7be2c6da63eaf71d211c6fae1a2c1f9575`; the one used
+  for the install below, re-pinned to the desktop image, is
+  `2d0ecc2b90e75a6fdda8f4b17367aff0ce808fa537f885674c4cac633e571ef3`.
+- **Installed from that medium to the COSMIC greeter.** The build for c000846
+  published `sha256:8f1fa6ab…`, the kickstart was re-pinned to it, and a VM
+  install (40 GiB disk, NAT) pulled 2.3 GB from GHCR in about fifteen minutes,
+  rebooted into `Fedora Linux 45 (Forty Five) (ostree:0)`, and came up at the
+  greeter. `bootc status` on the installed system names the pinned digest,
+  `/usr/lib/aios/build-id` reads `2026.11.11+gc000846.r9`, and
+  `greenboot-healthcheck.service` is enabled.
+- **The wizard was driven by keyboard**, because a headless VM has no mouse: Tab
+  moves between spokes, Enter opens one, Enter on the destination page applies it,
+  and **Alt+B** activates Begin Installation. With the disk answered in the UI, the
+  spoke's red "Kickstart insufficient" cleared and the install began.
+- **The account came from a test-only kickstart** (`build/aios-test.ks`, never
+  published) rather than typed into the User Creation dialog: scan-code typing into
+  the wizard proved too unreliable to trust, and the question this run answers is
+  whether the image installs and the account survives to the greeter. It does — the
+  greeter lists it by its full name, and its password logs into a COSMIC session.
+- **Two defects the install exposed, both still open.** `systemd-remount-fs.service`
+  fails: Anaconda writes `/etc/fstab` with `ro` for `/` and `/boot` while the kernel
+  boots `rw`, and the remount is rejected with `overlay: No changes allowed in
+  reconfigure`. And `/etc/locale.conf` lands as `LANG="C.UTF-8"` although the
+  kickstart asked for `en_US.UTF-8`, which cosmic-greeter rejects as an invalid
+  language. Neither blocks the desktop; both need an answer before real hardware.
+- **Also found: the evidence upload never worked.** `.evidence` is hidden and
+  `upload-artifact` skips hidden files, so build produced an empty artifact, `check`
+  failed to download a digest, and the failure read as a check problem. All three
+  uploads pass `include-hidden-files` now and the build and check uploads fail when
+  the evidence is missing. With the artifact present, `check` got as far as pulling
+  the image and failed on the next bug: it built the reference from
+  `github.repository`, which is `AshleyJackson/Chemtrail`, and podman rejects an
+  uppercase repository name. `check`, `boot-test` and `hw-test` now lowercase it the
+  way `build` already did.
 
 **2026-11-11, fifteenth revision.** The first image was published to GHCR, and the kickstart now points at it.
 

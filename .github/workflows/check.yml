@@ -31,13 +31,15 @@ jobs:
           find .evidence -name '*.json' -exec mv -n {} .evidence/ \;
           digest="$(python -c 'import glob,json; print(json.load(open(glob.glob(".evidence/*.json")[0]))["digest"])')"
           echo "digest=${digest}" >> "$GITHUB_ENV"
+          # GHCR package names must be lowercase; github.repository is mixed case.
+          echo "image_ref=ghcr.io/$(printf '%s' "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: lint the image
         run: |
           sudo podman login ghcr.io \
             -u "${{ github.actor }}" -p "${{ secrets.GITHUB_TOKEN }}"
-          sudo podman pull "ghcr.io/${{ github.repository }}@${digest}"
-          sudo podman run --rm "ghcr.io/${{ github.repository }}@${digest}" \
+          sudo podman pull "${image_ref}@${digest}"
+          sudo podman run --rm "${image_ref}@${digest}" \
             bootc container lint
 
       - name: record image evidence

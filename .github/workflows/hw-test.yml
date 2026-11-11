@@ -34,9 +34,10 @@ jobs:
           find .evidence -name '*.json' -exec mv -n {} .evidence/ \;
           digest="$(python3 -c 'import glob,json; print(json.load(open(glob.glob(".evidence/*.json")[0]))["digest"])')"
           echo "digest=${digest}" >> "$GITHUB_ENV"
+          echo "image_ref=ghcr.io/$(printf '%s' "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
 
       - name: initialise the GPU from inside the image
-        run: bash ci/hw-test.sh "ghcr.io/${{ github.repository }}@${digest}"
+        run: bash ci/hw-test.sh "${image_ref}@${digest}"
 
       - name: record hardware evidence
         env:
