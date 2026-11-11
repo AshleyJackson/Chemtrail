@@ -143,6 +143,32 @@ kickstart), and the NVIDIA layer arrives after first boot.
   over HTTP. The hosted kickstart itself is written once CI has published an image
   to pin it to; until then there is nothing for it to point at.
 
+**2026-11-11, fourteenth revision.** The network install works, and one defect fell out of it.
+
+- **`ci/build-netboot-iso.sh` builds the medium ADR-0020 describes.** Fedora's
+  Server netinst ISO, its checksum verified, with `install/aios-netinst.ks`
+  embedded and the boot entries rewritten to `inst.ks=hd:LABEL=…:/aios-netinst.ks`.
+  Output is `build/netboot/aios-netboot-x86_64.iso` at **1213 MiB**, against
+  3.42 GB for a builder-made ISO.
+- **It installed a machine end to end in VirtualBox**, unattended. The installer
+  pulled 74 layers (1.9 GB) from GHCR; `bootc status` on the installed system
+  reports `ghcr.io/ashleyjackson/chemtrail@sha256:867ac8ba…`, which is exactly the
+  digest the kickstart pinned, and `cat /usr/lib/aios/build-id` reports
+  `2026.11.10+g9219567.r6`.
+- **The installed system is healthy**: `systemctl is-system-running` says
+  `running`, `systemctl --failed` is empty, `nvidia.ko.xz` is present under
+  `/usr/lib/modules/7.3.3-300.fc45.x86_64/extra/nvidia/`, and
+  `bootc-fetch-apply-updates.timer` is masked as ADR-0016 requires.
+- **Found: greenboot's check runner ships disabled.** `systemctl is-enabled
+  greenboot-healthcheck.service` answered `disabled` on the installed system, so
+  the checks in `image/greenboot/check/` would never run and nothing would ever
+  roll back. The Containerfile now enables it; that fix is unverified until the
+  next image build is booted.
+- Two failures shaped the build script: Fedora publishes its checksums as
+  `Fedora-Server-45-1.4-x86_64-CHECKSUM` rather than `CHECKSUM`, and `mkksiso`
+  rebuilds the EFI image with `mkefiboot`, which needs `losetup` and therefore a
+  privileged container.
+
 **2026-11-10, thirteenth revision.** The installer turned out to be unpublishable.
 
 - **The ISO is 3.42 GB and GitHub caps a release asset at 2 GiB.** The nightly

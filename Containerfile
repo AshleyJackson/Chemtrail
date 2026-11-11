@@ -64,6 +64,13 @@ RUN dnf install -y --setopt=install_weak_deps=False \
 RUN dnf install -y --setopt=install_weak_deps=False greenboot \
  && dnf clean all
 
+# The package installs its check runner disabled. Observed on a freshly installed
+# system on 2026-11-11: `systemctl is-enabled greenboot-healthcheck.service`
+# answers `disabled`, and its preset is disabled too, so nothing would run the
+# checks and nothing would roll back. The rollback that ADR-0016 and the checks in
+# image/greenboot/check assume is only real if this is enabled in the image.
+RUN systemctl enable greenboot-healthcheck.service
+
 # The stock timer ships enabled, runs daily, and reboots. Combined with greenboot
 # rollback it re-applies the digest that was just rolled back from, producing a
 # boot loop (ADR-0016 §5). aios-updated owns the cadence instead.
